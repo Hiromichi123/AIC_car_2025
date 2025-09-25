@@ -1,6 +1,6 @@
 use rclrs::{log_info, CreateBasicExecutor};
 
-mod navi;
+pub mod navi;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

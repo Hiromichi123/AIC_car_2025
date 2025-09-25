@@ -1,32 +1,40 @@
-use rclrs::{log_debug, log_error, log_info};
+use rclrs::log_info;
+use rclrs::{SubscriptionState, WorkerState};
+use ros2_tools::msg::LidarPose;
 use std::sync::Arc;
-use std_msgs::msg::Float64;
-use std_msgs::msg::String as StringMsg;
+use std::sync::Mutex;
 
-#[derive(Debug, Default)]
-struct CoordUnit(f64, f64, f64);
+#[derive(Debug, Default, Clone, Copy)]
+pub struct CoordUnit(pub f64, pub f64, pub f64);
 
-#[derive(Debug, Default)]
-struct Pos {
-    translation: CoordUnit, // (x, y, z)
-    rotation: CoordUnit,    // (roll, pitch, yaw)
+#[derive(Debug, Default, Clone, Copy)]
+pub struct Pos {
+    pub translation: CoordUnit, // (x, y, z)
+    pub rotation: CoordUnit,    // (roll, pitch, yaw)
 }
 
-struct Navi {
-    dest_pos: Pos,
-    current_pos: Pos,
-    velocity: Pos,
-    is_arrived: bool,
+#[derive(Debug, Default)]
+pub struct Navi {
+    pub dest_pos: Option<Pos>,
+    pub current_pos: Pos,
+    pub velocity: Pos,
+    pub is_arrived: bool,
     arrive_threshold: f64,
 }
 
-struct NaviSubData {
-    node: rclrs::Node,
-    current_pos: Pos,
+pub struct NaviSubNode {
+    #[allow(unused)]
+    pub navi_instance: Arc<Mutex<Navi>>,
+    _subscription: Arc<SubscriptionState<LidarPose, Arc<WorkerState<LidarPose>>>>,
 }
 
-pub struct NaviSubNode {
-    subscription: rclrs::WorkerSubscription<StringMsg, NaviSubData>,
+impl From<LidarPose> for Pos {
+    fn from(lidar_pose: LidarPose) -> Self {
+        Pos {
+            translation: CoordUnit(lidar_pose.x, lidar_pose.y, lidar_pose.z),
+            rotation: CoordUnit(lidar_pose.roll, lidar_pose.pitch, lidar_pose.yaw),
+        }
+    }
 }
 
 impl CoordUnit {
@@ -39,48 +47,69 @@ impl CoordUnit {
 }
 
 impl Navi {
-    fn new(dest_pos: Pos, threshold: f64) -> Self {
-        Navi {
-            dest_pos,
-            current_pos: Pos::default(),
-            velocity: Pos::default(),
-            is_arrived: false,
-            arrive_threshold: threshold,
+    fn new() -> Self {
+        Navi::default()
+    }
+
+    pub fn set_dest(&mut self, dest: Pos, threshold: f64) {
+        match self.dest_pos {
+            None => {
+                self.dest_pos = Some(dest);
+                self.arrive_threshold = threshold;
+                self.is_arrived = false;
+                log_info!("set dest", "destination set to {:?}", dest);
+            }
+            Some(_) => {
+                log_info!("set dest", "car not arrived!");
+            }
         }
     }
 
-    fn update(&mut self, current_pos: Pos) -> bool {
+    fn update(&mut self, current_pos: Pos) -> Option<bool> {
         self.current_pos = current_pos;
-        if !self.is_arrived
-            && self
-                .dest_pos
-                .translation
-                .cal_distance(&self.current_pos.translation)
-                <= self.arrive_threshold
-        {
-            self.is_arrived = true;
-            return true;
-        }
 
-        false
+        let dest_pos = match &self.dest_pos {
+            Some(pos) => pos,
+            None => {
+                log_info!("navi update", "dest not set");
+                return None;
+            }
+        };
+
+        let distance = dest_pos
+            .translation
+            .cal_distance(&self.current_pos.translation);
+        if !self.is_arrived && distance <= self.arrive_threshold {
+            self.is_arrived = true;
+            self.dest_pos = None; // for moving interval check
+            log_info!("pos update", "car arrived!");
+            return Some(true);
+        } else {
+            log_info!("pos update", "dest distance: {distance}");
+            return Some(false);
+        }
     }
 }
 
 impl NaviSubNode {
-    pub fn new(
-        executor: &rclrs::Executor,
-        name: &str,
-        topic: &str,
-    ) -> Result<Self, rclrs::RclrsError> {
+    pub fn new(executor: &rclrs::Executor, name: &str, topic: &str) -> anyhow::Result<Self> {
         let node = executor.create_node(name)?;
-        let worker = node.create_worker::<NaviSubData>(NaviSubData {
-            node: Arc::clone(&node),
-            current_pos: Pos::default(),
-        });
+        let worker = node.create_worker(LidarPose::default());
 
-        let subscription =
-            worker.create_subscription(topic, |data: &mut NaviSubData, msg: StringMsg| todo!())?;
+        let navi_instance = Arc::new(Mutex::new(Navi::new()));
 
-        Ok(NaviSubNode { subscription })
+        let navi_instance_clone = Arc::clone(&navi_instance);
+        let _subscription =
+            worker.create_subscription::<LidarPose, _>(topic, move |msg: LidarPose| {
+                log_info!("navi worker", "received lidar pos: {:?}", msg);
+                if let Ok(mut navi) = navi_instance_clone.lock() {
+                    navi.update(msg.into());
+                };
+            })?;
+
+        Ok(NaviSubNode {
+            navi_instance,
+            _subscription,
+        })
     }
 }
