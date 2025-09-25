@@ -13,9 +13,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: chdir
-      run: cd navi_rs
     - name: Build
       run: cargo build --verbose
+      working-directory: ./AIC_car_2025/navi_rs
     - name: Run tests
       run: cargo test --verbose
+      working-directory: ./AIC_car_2025/navi_rs
