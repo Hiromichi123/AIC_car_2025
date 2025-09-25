@@ -52,9 +52,17 @@ impl Navi {
     }
 
     fn set_dest(&mut self, dest: Pos, threshold: f64) {
-        self.dest_pos = Some(dest);
-        self.arrive_threshold = threshold;
-        log_info!("set dest", "destination set to {:?}", dest);
+        match self.dest_pos {
+            None => {
+                self.dest_pos = Some(dest);
+                self.arrive_threshold = threshold;
+                self.is_arrived = false;
+                log_info!("set dest", "destination set to {:?}", dest);
+            }
+            Some(_) => {
+                log_info!("set dest", "car not arrived!");
+            }
+        }
     }
 
     fn update(&mut self, current_pos: Pos) -> Option<bool> {
@@ -73,6 +81,7 @@ impl Navi {
             .cal_distance(&self.current_pos.translation);
         if !self.is_arrived && distance <= self.arrive_threshold {
             self.is_arrived = true;
+            self.dest_pos = None; // for moving interval check
             log_info!("pos update", "car arrived!");
             return Some(true);
         } else {
@@ -93,8 +102,9 @@ impl NaviSubNode {
         let _subscription =
             worker.create_subscription::<LidarPose, _>(topic, move |msg: LidarPose| {
                 log_info!("navi worker", "received lidar pos: {:?}", msg);
-                let mut navi = navi_instance_clone.lock().unwrap();
-                navi.update(msg.into());
+                if let Ok(mut navi) = navi_instance_clone.lock() {
+                    navi.update(msg.into());
+                };
             })?;
 
         Ok(NaviSubNode {
