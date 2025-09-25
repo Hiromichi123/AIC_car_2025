@@ -1,8 +1,8 @@
-#include <rclcpp/rclcpp.hpp>
 #include <cmath>
-#include <nav_msgs/msg/odometry.hpp>
-#include <tf2/LinearMath/Quaternion.h>
 #include <geometry_msgs/msg/pose_stamped.hpp>
+#include <nav_msgs/msg/odometry.hpp>
+#include <rclcpp/rclcpp.hpp>
+#include <tf2/LinearMath/Quaternion.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
 #include "ros2_tools/msg/lidar_pose.hpp"
@@ -26,18 +26,25 @@ public:
         RCLCPP_INFO(this->get_logger(), "aft_mapped_to_init subscription successful.");
 
         // px4_local_position 订阅
-        local_position_sub = this->create_subscription<geometry_msgs::msg::PoseStamped>("mavros/local_position/pose", qos_profile, std::bind(&LidarDataNode::localPositionCallback, this, std::placeholders::_1));
-        RCLCPP_INFO(this->get_logger(), "PX4 Local Position subscription successful.");
+        local_position_sub =
+            this->create_subscription<geometry_msgs::msg::PoseStamped>(
+                "mavros/local_position/pose", qos_profile,
+                std::bind(&LidarDataNode::localPositionCallback, this,
+                        std::placeholders::_1));
+
+        RCLCPP_INFO(this->get_logger(),"PX4 Local Position subscription successful.");
     }
 
     // lidar数据回调
     void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg) {
-        if (!using_gazebo) msgDispose(msg->pose.pose); // 实机模式，处理雷达数据
+        if (!using_gazebo)
+            msgDispose(msg->pose.pose); // 实机模式，处理雷达数据
     }
 
     // PX4数据回调
     void localPositionCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
-        if (using_gazebo) msgDispose(msg->pose); // 仿真模式，处理PX4数据
+        if (using_gazebo)
+            msgDispose(msg->pose); // 仿真模式，处理PX4数据
     }
 
     // msg统一处理函数
@@ -46,7 +53,8 @@ public:
         double x = pose.position.x;
         double y = pose.position.y;
         double z = pose.position.z;
-        tf2::Quaternion q(pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w);
+        tf2::Quaternion q(pose.orientation.x, pose.orientation.y,
+                        pose.orientation.z, pose.orientation.w);
         tf2::Matrix3x3 m(q);
         double roll, pitch, yaw;
         m.getRPY(roll, pitch, yaw);
@@ -68,10 +76,10 @@ public:
 
         static int counter = 0;
         if (++counter >= 50) {
-            RCLCPP_INFO(this->get_logger(), 
-                        "Position=(%.2f, %.2f, %.2f), Orientation=(%.2f, %.2f, %.2f) rad",
-                        x, y, z, roll, pitch, yaw);
-            counter = 0;
+            RCLCPP_INFO(
+                this->get_logger(),
+                "Position=(%.2f, %.2f, %.2f), Orientation=(%.2f, %.2f, %.2f) rad", x, y, z, roll, pitch, yaw);
+                counter = 0;
         }
     }
 

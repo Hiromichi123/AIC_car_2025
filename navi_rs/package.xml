@@ -7,6 +7,7 @@
 
   <depend>rclrs</depend>
   <depend>std_msgs</depend>
+  <depend>ros2_tools</depend>
 
   <export>
     <build_type>ament_cargo</build_type>
