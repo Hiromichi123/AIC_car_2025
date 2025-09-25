@@ -17,16 +17,20 @@ public:
         lidar_pub = this->create_publisher<ros2_tools::msg::LidarPose>("lidar_data", 10);
         RCLCPP_INFO(this->get_logger(), "lidar_data publisher created");
 
-        // Odometry 订阅
-        odom_sub = this->create_subscription<nav_msgs::msg::Odometry>("/Odometry", 10, std::bind(&LidarDataNode::odomCallback, this, std::placeholders::_1));
-        RCLCPP_INFO(this->get_logger(), "Odometry subscription successful.");
+        // Odometry 订阅 Fastlio 版
+        //odom_sub = this->create_subscription<nav_msgs::msg::Odometry>("/Odometry", 10, std::bind(&LidarDataNode::odomCallback, this, std::placeholders::_1));
+        //RCLCPP_INFO(this->get_logger(), "Odometry subscription successful.");
+
+        // aft_mapped_to_init 订阅 PointLIO 版
+        odom_sub = this->create_subscription<nav_msgs::msg::Odometry>("/aft_mapped_to_init", 10, std::bind(&LidarDataNode::odomCallback, this, std::placeholders::_1));
+        RCLCPP_INFO(this->get_logger(), "aft_mapped_to_init subscription successful.");
 
         // px4_local_position 订阅
         local_position_sub = this->create_subscription<geometry_msgs::msg::PoseStamped>("mavros/local_position/pose", qos_profile, std::bind(&LidarDataNode::localPositionCallback, this, std::placeholders::_1));
         RCLCPP_INFO(this->get_logger(), "PX4 Local Position subscription successful.");
     }
 
-    // 雷达数据回调
+    // lidar数据回调
     void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg) {
         if (!using_gazebo) msgDispose(msg->pose.pose); // 实机模式，处理雷达数据
     }
@@ -47,7 +51,7 @@ public:
         double roll, pitch, yaw;
         m.getRPY(roll, pitch, yaw);
 
-        // 确保欧拉角为正
+        // 正向归一化
         if (roll < 0) roll += 2 * M_PI;
         if (pitch < 0) pitch += 2 * M_PI;
         if (yaw < 0) yaw += 2 * M_PI;
@@ -82,7 +86,7 @@ private:
 int main(int argc, char **argv) {
     rclcpp::init(argc, argv);
     auto node = std::make_shared<LidarDataNode>();
-    RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Lidar node completed");
+    RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Lidar_data_node completed");
     rclcpp::spin(node);
     rclcpp::shutdown();
     return 0;
