@@ -5,26 +5,26 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 #[derive(Debug, Default, Clone, Copy)]
-struct CoordUnit(f64, f64, f64);
+pub struct CoordUnit(pub f64, pub f64, pub f64);
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Pos {
-    translation: CoordUnit, // (x, y, z)
-    rotation: CoordUnit,    // (roll, pitch, yaw)
+    pub translation: CoordUnit, // (x, y, z)
+    pub rotation: CoordUnit,    // (roll, pitch, yaw)
 }
 
 #[derive(Debug, Default)]
 pub struct Navi {
-    dest_pos: Option<Pos>,
-    current_pos: Pos,
-    velocity: Pos,
-    is_arrived: bool,
+    pub dest_pos: Option<Pos>,
+    pub current_pos: Pos,
+    pub velocity: Pos,
+    pub is_arrived: bool,
     arrive_threshold: f64,
 }
 
 pub struct NaviSubNode {
     #[allow(unused)]
-    navi_instance: Arc<Mutex<Navi>>,
+    pub navi_instance: Arc<Mutex<Navi>>,
     _subscription: Arc<SubscriptionState<LidarPose, Arc<WorkerState<LidarPose>>>>,
 }
 
@@ -51,7 +51,7 @@ impl Navi {
         Navi::default()
     }
 
-    fn set_dest(&mut self, dest: Pos, threshold: f64) {
+    pub fn set_dest(&mut self, dest: Pos, threshold: f64) {
         match self.dest_pos {
             None => {
                 self.dest_pos = Some(dest);
