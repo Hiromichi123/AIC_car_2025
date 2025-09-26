@@ -1,0 +1,33 @@
+<?xml version="1.0" ?>
+<sdf version="1.5">
+  <model name="aic_plane">
+    <static>true</static>
+    <link name="link">
+      <pose>0 0 0.01 0 0 0</pose>
+      <collision name="collision">
+        <geometry>
+          <plane>
+            <normal>0 0 1</normal>
+            <size>4 4</size>
+          </plane>
+        </geometry>
+      </collision>
+      <visual name="visual">
+        <cast_shadows>false</cast_shadows>
+        <geometry>
+          <plane>
+            <normal>0 0 1</normal>
+            <size>4 4</size>
+          </plane>
+        </geometry>
+        <material>
+          <script>
+            <uri>model://aic_plane/materials/scripts</uri>
+            <uri>model://aic_plane/materials/textures</uri>
+            <name>aic_plane</name>
+          </script>
+        </material>
+      </visual>
+    </link>
+  </model>
+</sdf>
