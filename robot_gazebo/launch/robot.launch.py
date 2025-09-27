@@ -1,25 +1,57 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.actions import ExecuteProcess
+from launch.actions import ExecuteProcess, RegisterEventHandler, TimerAction
+from launch.event_handlers import OnProcessStart
+from launch.substitutions import Command
 import os
 
 def generate_launch_description():
     pkg_path = os.path.dirname(os.path.abspath(__file__))
     world_file = os.path.join(pkg_path, '..', 'worlds', 'empty.world')
+    urdf_xacro = os.path.join(pkg_path, '..', 'urdf', 'robot.urdf.xacro')
     urdf_file = os.path.join(pkg_path, '..', 'urdf', 'robot.urdf')
 
-    return LaunchDescription([
-        # 通过 gazebo_ros 启动 world
-        ExecuteProcess(
-            cmd=['gazebo', world_file, '-s', 'libgazebo_ros_factory.so'],
-            output='screen'
-        ),
+    # xacro 生成 urdf
+    xacro_urdf_process = ExecuteProcess(
+        cmd=['ros2', 'run', 'xacro', 'xacro', urdf_xacro, '-o', urdf_file],
+        output='screen'
+    )
 
-        # spawn URDF
-        Node(
-            package='gazebo_ros',
-            executable='spawn_entity.py',
-            arguments=['-file', urdf_file, '-entity', 'mycar'],
-            output='screen'
-        )
+    # 启动 Gazebo
+    gazebo_process = ExecuteProcess(
+        cmd=['gazebo', '--verbose', 
+            '-s', 'libgazebo_ros_factory.so',
+            '-s', 'libgazebo_ros_init.so',
+            world_file],
+        output='screen'
+    )
+
+    # 发布 robot_description
+    robot_description = Node(
+        package='robot_state_publisher',
+        executable='robot_state_publisher',
+        name='robot_state_publisher',
+        output='screen',
+        parameters=[{'robot_description': open(urdf_file).read()}]
+    )
+
+    # 使用参数服务器加载URDF
+    spawn_entity_node = Node(
+        package='gazebo_ros',
+        executable='spawn_entity.py',
+        arguments=[
+            '-topic', 'robot_description',  # 从参数服务器获取URDF
+            '-entity', 'mycar',
+            '-x', '1.65',
+            '-y', '1.65',
+            '-z', '0.05'
+        ],
+        output='screen'
+    )
+
+    return LaunchDescription([
+        xacro_urdf_process,
+        gazebo_process,
+        robot_description,
+        spawn_entity_node
     ])
