@@ -1115,6 +1115,10 @@ name = "nav_msgs"
 version = "4.9.0"
 
 [[patch.unused]]
+name = "navi_rs"
+version = "0.1.0"
+
+[[patch.unused]]
 name = "rcl_interfaces"
 version = "1.2.1"
 

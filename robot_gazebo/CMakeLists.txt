@@ -11,5 +11,6 @@ find_package(gazebo_ros REQUIRED)
 install(DIRECTORY launch DESTINATION share/${PROJECT_NAME}/) # 安装 launch 文件
 install(DIRECTORY worlds DESTINATION share/${PROJECT_NAME}/) # 安装 world 文件
 install(DIRECTORY urdf DESTINATION share/${PROJECT_NAME}/) # 安装 URDF 文件
+install(DIRECTORY config DESTINATION share/${PROJECT_NAME}/) # 安装 config 文件
 
 ament_package()

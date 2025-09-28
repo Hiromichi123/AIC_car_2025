@@ -251,4 +251,34 @@
   <gazebo reference="laser">
     <material>Gazebo/Black</material>
   </gazebo>
+  <!-- 接口声明 -->
+  <ros2_control name="GazeboSystem" type="system">
+    <hardware>
+      <plugin>gazebo_ros2_control/GazeboSystem</plugin>
+    </hardware>
+    <joint name="left_wheel2base_link">
+      <command_interfaces>
+        <command_interface name="velocity"/>
+      </command_interfaces>
+      <state_interfaces>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+      </state_interfaces>
+    </joint>
+    <joint name="right_wheel2base_link">
+      <command_interfaces>
+        <command_interface name="velocity"/>
+      </command_interfaces>
+      <state_interfaces>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+      </state_interfaces>
+    </joint>
+  </ros2_control>
+  <!-- ros2_control 插件加载 -->
+  <gazebo>
+    <plugin filename="libgazebo_ros2_control.so" name="gazebo_ros2_control">
+      <parameters>/home/hiro/ros2/AIC_car_2025/install/robot_gazebo/share/robot_gazebo/config/ros2_config.yaml</parameters>
+    </plugin>
+  </gazebo>
 </robot>

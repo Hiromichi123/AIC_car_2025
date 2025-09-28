@@ -4,4 +4,5 @@
     <xacro:include filename="my_base.urdf.xacro" />
     <xacro:include filename="my_camera.urdf.xacro" />
     <xacro:include filename="my_laser.urdf.xacro" />
+    <xacro:include filename="move.urdf.xacro" />
 </robot>

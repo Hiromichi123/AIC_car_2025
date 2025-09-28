@@ -1,0 +1,18 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 100
+
+    diff_drive_base_controller:
+      type: diff_drive_controller/DiffDriveController
+
+      left_wheel_names: ["left_wheel2base_link"]
+      right_wheel_names: ["right_wheel2base_link"]
+
+      wheel_separation: 0.2 # 轮距
+      wheel_radius: 0.1 # 轮半径
+
+      publish_rate: 50.0 # 发布频率
+      enable_odom_tf: true # 发布里程计TF
+      odom_frame_id: odom # 里程计坐标系
+      base_frame_id: base_footprint # 机器人底盘坐标系
+      cmd_vel_timeout: 0.25 # cmd_vel超时时间
