@@ -257,22 +257,14 @@
       <plugin>gazebo_ros2_control/GazeboSystem</plugin>
     </hardware>
     <joint name="left_wheel2base_link">
-      <command_interfaces>
-        <command_interface name="velocity"/>
-      </command_interfaces>
-      <state_interfaces>
-        <state_interface name="position"/>
-        <state_interface name="velocity"/>
-      </state_interfaces>
+      <command_interface name="velocity"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
     </joint>
     <joint name="right_wheel2base_link">
-      <command_interfaces>
-        <command_interface name="velocity"/>
-      </command_interfaces>
-      <state_interfaces>
-        <state_interface name="position"/>
-        <state_interface name="velocity"/>
-      </state_interfaces>
+      <command_interface name="velocity"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
     </joint>
   </ros2_control>
   <!-- ros2_control 插件加载 -->
