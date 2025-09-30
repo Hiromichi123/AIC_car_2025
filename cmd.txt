@@ -1,0 +1,23 @@
+ros2 param set /controller_manager diff_drive_base_controller.type "diff_drive_controller/DiffDriveController"
+ros2 param set /controller_manager diff_drive_base_controller.left_wheel_names "['left_wheel2base_link']"
+ros2 param set /controller_manager diff_drive_base_controller.right_wheel_names "['right_wheel2base_link']"
+ros2 param set /controller_manager diff_drive_base_controller.wheel_separation 0.2
+ros2 param set /controller_manager diff_drive_base_controller.wheel_radius 0.0325
+ros2 param set /controller_manager diff_drive_base_controller.publish_rate 50.0
+ros2 param set /controller_manager diff_drive_base_controller.enable_odom_tf true
+ros2 param set /controller_manager diff_drive_base_controller.cmd_vel_timeout 0.25
+ros2 param set /controller_manager diff_drive_base_controller.odom_frame_id "odom"
+ros2 param set /controller_manager diff_drive_base_controller.base_frame_id "base_footprint"
+
+ros2 control load_controller --set-state active diff_drive_base_controller
+
+ros2 param get /controller_manager diff_drive_base_controller.type
+ros2 param get /controller_manager diff_drive_base_controller.left_wheel_names
+ros2 param get /controller_manager diff_drive_base_controller.right_wheel_names
+ros2 param get /controller_manager diff_drive_base_controller.wheel_separation
+ros2 param get /controller_manager diff_drive_base_controller.wheel_radius
+ros2 param get /controller_manager diff_drive_base_controller.publish_rate
+ros2 param get /controller_manager diff_drive_base_controller.enable_odom_tf
+ros2 param get /controller_manager diff_drive_base_controller.cmd_vel_timeout
+ros2 param get /controller_manager diff_drive_base_controller.odom_frame_id
+ros2 param get /controller_manager diff_drive_base_controller.base_frame_id

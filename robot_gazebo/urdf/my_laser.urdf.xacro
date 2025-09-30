@@ -1,6 +1,6 @@
 <!-- 雷达 -->
 <robot name="my_laser" xmlns:xacro="http://wiki.ros.org/xacro">
-    <xacro:property name="support_length" value="0.15" /> <!-- 支架长度 -->
+    <xacro:property name="support_length" value="0.05" /> <!-- 支架长度 -->
     <xacro:property name="support_radius" value="0.01" /> <!-- 支架半径 -->
     <xacro:property name="support_x" value="0.0" /> <!-- 支架安装的x坐标 -->
     <xacro:property name="support_y" value="0.0" /> <!-- 支架安装的y坐标 -->
@@ -46,7 +46,6 @@
     <xacro:property name="laser_x" value="0.0" /> <!-- 雷达安装的x坐标 -->
     <xacro:property name="laser_y" value="0.0" /> <!-- 雷达安装的y坐标 -->
     <xacro:property name="laser_z" value="${support_length / 2 + laser_length / 2}" /> <!-- 雷达安装的z坐标:支架高度 / 2 + 雷达高度 / 2  -->
-
     <xacro:property name="laser_m" value="0.1" /> <!-- 雷达质量 -->
 
     <!-- 雷达关节以及link -->

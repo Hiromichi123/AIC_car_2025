@@ -38,7 +38,7 @@ def generate_launch_description():
 
     # 启动 Gazebo
     gazebo_process = ExecuteProcess(
-        cmd=['gazebo', '--verbose', 
+        cmd=['gazebo', 
             '-s', 'libgazebo_ros_factory.so',
             '-s', 'libgazebo_ros_init.so',
             world_file],
@@ -80,31 +80,38 @@ def generate_launch_description():
                 output='screen'
             ),
             ExecuteProcess(
-                cmd=['ros2', 'param', 'set', '/controller_manager', 'diff_drive_base_controller.wheel_separation', '0.2'],
+                cmd=['ros2', 'param', 'set', '/controller_manager', 'diff_drive_base_controller.wheel_separation', 
+                     '0.2'],
                 output='screen'
             ),
             ExecuteProcess(
-                cmd=['ros2', 'param', 'set', '/controller_manager', 'diff_drive_base_controller.wheel_radius', '0.0325'],
+                cmd=['ros2', 'param', 'set', '/controller_manager', 'diff_drive_base_controller.wheel_radius', 
+                     '0.0325'],
                 output='screen'
             ),
             ExecuteProcess(
-                cmd=['ros2', 'param', 'set', '/controller_manager', 'diff_drive_base_controller.publish_rate', '50.0'],
+                cmd=['ros2', 'param', 'set', '/controller_manager', 'diff_drive_base_controller.publish_rate', 
+                     '50.0'],
                 output='screen'
             ),
             ExecuteProcess(
-                cmd=['ros2', 'param', 'set', '/controller_manager', 'diff_drive_base_controller.enable_odom_tf', 'true'],
+                cmd=['ros2', 'param', 'set', '/controller_manager', 'diff_drive_base_controller.enable_odom_tf', 
+                     'true'],
                 output='screen'
             ),
             ExecuteProcess(
-                cmd=['ros2', 'param', 'set', '/controller_manager', 'diff_drive_base_controller.cmd_vel_timeout', '0.25'],
+                cmd=['ros2', 'param', 'set', '/controller_manager', 'diff_drive_base_controller.cmd_vel_timeout', 
+                     '0.25'],
                 output='screen'
             ),
             ExecuteProcess(
-                cmd=['ros2', 'param', 'set', '/controller_manager', 'diff_drive_base_controller.odom_frame_id', 'odom'],
+                cmd=['ros2', 'param', 'set', '/controller_manager', 'diff_drive_base_controller.odom_frame_id', 
+                     'odom'],
                 output='screen'
             ),
             ExecuteProcess(
-                cmd=['ros2', 'param', 'set', '/controller_manager', 'diff_drive_base_controller.base_frame_id', 'base_footprint'],
+                cmd=['ros2', 'param', 'set', '/controller_manager', 'diff_drive_base_controller.base_frame_id', 
+                     'base_footprint'],
                 output='screen'
             )
         ]
@@ -127,6 +134,6 @@ def generate_launch_description():
         controller_manager,
         gazebo_process,
         delayed_spawn,
-        #set_params,
-        #load_controller
+        set_params,
+        load_controller
     ])
