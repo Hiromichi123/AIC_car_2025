@@ -4,19 +4,14 @@
 <!-- |    EDITING THIS FILE BY HAND IS NOT RECOMMENDED                                 | -->
 <!-- =================================================================================== -->
 <robot name="my_robot">
-  <!-- 宏:黑色设置 -->
+  <!-- 宏:颜色设置 -->
   <material name="black">
     <color rgba="0.0 0.0 0.0 1.0"/>
   </material>
-  <!-- 质量  -->
-  <!-- 底盘 -->
-  <link name="base_footprint">
-    <visual>
-      <geometry>
-        <sphere radius="0.001"/>
-      </geometry>
-    </visual>
-  </link>
+  <material name="yellow">
+    <color rgba="1.0 1.0 0.0 1.0"/>
+  </material>
+  <!-- 底盘主体 -->
   <link name="base_link">
     <visual>
       <geometry>
@@ -27,139 +22,168 @@
         <color rgba="0.5 0.3 0.0 0.5"/>
       </material>
     </visual>
-    <collision>
-      <geometry>
-        <cylinder length="0.08" radius="0.1"/>
-      </geometry>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-    </collision>
-    <inertial>
-      <mass value="0.5"/>
-      <inertia ixx="0.001516666666666667" ixy="0" ixz="0" iyy="0.001516666666666667" iyz="0" izz="0.0025000000000000005"/>
-    </inertial>
   </link>
-  <joint name="base_link2base_footprint" type="fixed">
-    <parent link="base_footprint"/>
-    <child link="base_link"/>
-    <origin xyz="0 0 0.055"/>
-  </joint>
-  <gazebo reference="base_link">
-    <material>Gazebo/Yellow</material>
-  </gazebo>
-  <!-- 质量  -->
-  <link name="left_wheel">
+  <link name="front_left_wheel">
     <visual>
       <geometry>
-        <cylinder length="0.015" radius="0.0325"/>
+        <cylinder length="0.02" radius="0.0325"/>
       </geometry>
-      <origin rpy="1.5707963 0.0 0.0" xyz="0.0 0.0 0.0"/>
-      <material name="black"/>
+      <origin rpy="1.5707963 0 0" xyz="0 0 0"/>
+      <material name="yellow"/>
     </visual>
     <collision>
       <geometry>
-        <cylinder length="0.015" radius="0.0325"/>
+        <cylinder length="0.02" radius="0.0325"/>
       </geometry>
-      <origin rpy="1.5707963 0.0 0.0" xyz="0.0 0.0 0.0"/>
+      <origin rpy="1.5707963 0 0" xyz="0 0 0"/>
     </collision>
     <inertial>
-      <mass value="0.05"/>
-      <inertia ixx="1.4140625000000002e-05" ixy="0" ixz="0" iyy="1.4140625000000002e-05" iyz="0" izz="2.6406250000000005e-05"/>
+      <mass value="0.1"/>
+      <inertia ixx="2.9739583333333336e-05" ixy="0" ixz="0" iyy="2.9739583333333336e-05" iyz="0" izz="5.281250000000001e-05"/>
     </inertial>
   </link>
-  <joint name="left_wheel2base_link" type="continuous">
+  <joint name="front_left_wheel_joint" type="continuous">
     <parent link="base_link"/>
-    <child link="left_wheel"/>
-    <origin xyz="0 0.1 -0.0225"/>
+    <child link="front_left_wheel"/>
+    <origin rpy="0 0 0" xyz="0.12 0.1 -0.0225"/>
     <axis xyz="0 1 0"/>
   </joint>
-  <gazebo reference="left_wheel">
-    <material>Gazebo/Red</material>
+  <gazebo reference="front_left_wheel">
+    <material>Gazebo/yellow</material>
   </gazebo>
-  <link name="right_wheel">
+  <link name="front_right_wheel">
     <visual>
       <geometry>
-        <cylinder length="0.015" radius="0.0325"/>
+        <cylinder length="0.02" radius="0.0325"/>
       </geometry>
-      <origin rpy="1.5707963 0.0 0.0" xyz="0.0 0.0 0.0"/>
-      <material name="black"/>
+      <origin rpy="1.5707963 0 0" xyz="0 0 0"/>
+      <material name="yellow"/>
     </visual>
     <collision>
       <geometry>
-        <cylinder length="0.015" radius="0.0325"/>
+        <cylinder length="0.02" radius="0.0325"/>
       </geometry>
-      <origin rpy="1.5707963 0.0 0.0" xyz="0.0 0.0 0.0"/>
+      <origin rpy="1.5707963 0 0" xyz="0 0 0"/>
     </collision>
     <inertial>
-      <mass value="0.05"/>
-      <inertia ixx="1.4140625000000002e-05" ixy="0" ixz="0" iyy="1.4140625000000002e-05" iyz="0" izz="2.6406250000000005e-05"/>
+      <mass value="0.1"/>
+      <inertia ixx="2.9739583333333336e-05" ixy="0" ixz="0" iyy="2.9739583333333336e-05" iyz="0" izz="5.281250000000001e-05"/>
     </inertial>
   </link>
-  <joint name="right_wheel2base_link" type="continuous">
+  <joint name="front_right_wheel_joint" type="continuous">
     <parent link="base_link"/>
-    <child link="right_wheel"/>
-    <origin xyz="0 -0.1 -0.0225"/>
+    <child link="front_right_wheel"/>
+    <origin rpy="0 0 0" xyz="0.12 -0.1 -0.0225"/>
     <axis xyz="0 1 0"/>
   </joint>
-  <gazebo reference="right_wheel">
-    <material>Gazebo/Red</material>
+  <gazebo reference="front_right_wheel">
+    <material>Gazebo/yellow</material>
   </gazebo>
-  <!-- 质量  -->
-  <link name="front_wheel">
+  <link name="rear_left_wheel">
     <visual>
       <geometry>
-        <sphere radius="0.0075"/>
+        <cylinder length="0.02" radius="0.0325"/>
       </geometry>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <material name="black"/>
+      <origin rpy="1.5707963 0 0" xyz="0 0 0"/>
+      <material name="yellow"/>
     </visual>
     <collision>
       <geometry>
-        <sphere radius="0.0075"/>
+        <cylinder length="0.02" radius="0.0325"/>
       </geometry>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <origin rpy="1.5707963 0 0" xyz="0 0 0"/>
     </collision>
     <inertial>
-      <mass value="0.03"/>
-      <inertia ixx="6.75e-07" ixy="0" ixz="0" iyy="6.75e-07" iyz="0" izz="6.75e-07"/>
+      <mass value="0.1"/>
+      <inertia ixx="2.9739583333333336e-05" ixy="0" ixz="0" iyy="2.9739583333333336e-05" iyz="0" izz="5.281250000000001e-05"/>
     </inertial>
   </link>
-  <joint name="front_wheel2base_link" type="continuous">
+  <joint name="rear_left_wheel_joint" type="continuous">
     <parent link="base_link"/>
-    <child link="front_wheel"/>
-    <origin xyz="0.0925 0 -0.0475"/>
-    <axis xyz="1 1 1"/>
+    <child link="rear_left_wheel"/>
+    <origin rpy="0 0 0" xyz="-0.12 0.1 -0.0225"/>
+    <axis xyz="0 1 0"/>
   </joint>
-  <gazebo reference="front_wheel">
-    <material>Gazebo/Red</material>
+  <gazebo reference="rear_left_wheel">
+    <material>Gazebo/yellow</material>
   </gazebo>
-  <link name="back_wheel">
+  <link name="rear_right_wheel">
     <visual>
       <geometry>
-        <sphere radius="0.0075"/>
+        <cylinder length="0.02" radius="0.0325"/>
       </geometry>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <material name="black"/>
+      <origin rpy="1.5707963 0 0" xyz="0 0 0"/>
+      <material name="yellow"/>
     </visual>
     <collision>
       <geometry>
-        <sphere radius="0.0075"/>
+        <cylinder length="0.02" radius="0.0325"/>
       </geometry>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <origin rpy="1.5707963 0 0" xyz="0 0 0"/>
     </collision>
     <inertial>
-      <mass value="0.03"/>
-      <inertia ixx="6.75e-07" ixy="0" ixz="0" iyy="6.75e-07" iyz="0" izz="6.75e-07"/>
+      <mass value="0.1"/>
+      <inertia ixx="2.9739583333333336e-05" ixy="0" ixz="0" iyy="2.9739583333333336e-05" iyz="0" izz="5.281250000000001e-05"/>
     </inertial>
   </link>
-  <joint name="back_wheel2base_link" type="continuous">
+  <joint name="rear_right_wheel_joint" type="continuous">
     <parent link="base_link"/>
-    <child link="back_wheel"/>
-    <origin xyz="-0.0925 0 -0.0475"/>
-    <axis xyz="1 1 1"/>
+    <child link="rear_right_wheel"/>
+    <origin rpy="0 0 0" xyz="-0.12 -0.1 -0.0225"/>
+    <axis xyz="0 1 0"/>
   </joint>
-  <gazebo reference="back_wheel">
-    <material>Gazebo/Red</material>
+  <gazebo reference="rear_right_wheel">
+    <material>Gazebo/yellow</material>
   </gazebo>
+  <!-- ========== ros2_control 定义 ========== -->
+  <ros2_control name="GazeboSystem" type="system">
+    <hardware>
+      <plugin>gazebo_ros2_control/GazeboSystem</plugin>
+    </hardware>
+    <!-- 四个麦轮 joint -->
+    <joint name="front_left_wheel_joint">
+      <command_interface name="velocity"/>
+      <state_interface name="velocity"/>
+    </joint>
+    <joint name="front_right_wheel_joint">
+      <command_interface name="velocity"/>
+      <state_interface name="velocity"/>
+    </joint>
+    <joint name="rear_left_wheel_joint">
+      <command_interface name="velocity"/>
+      <state_interface name="velocity"/>
+    </joint>
+    <joint name="rear_right_wheel_joint">
+      <command_interface name="velocity"/>
+      <state_interface name="velocity"/>
+    </joint>
+  </ros2_control>
+  <gazebo>
+    <plugin filename="libgazebo_ros2_control.so" name="gazebo_ros2_control">
+      <parameters>/home/hiro/ros2/AIC_car_2025/robot_gazebo/urdf/mecanum_controllers.yaml</parameters>
+    </plugin>
+  </gazebo>
+  <controller name="mecanum_controller" type="mecanum_drive_controller/MecanumDriveController">
+    <ros>
+      <namespace>/</namespace>
+      <!-- <parameters>
+        <param name="front_left_wheel_command_joint_name" value="front_left_wheel_joint"/>
+        <param name="front_right_wheel_command_joint_name" value="front_right_wheel_joint"/>
+        <param name="rear_left_wheel_command_joint_name" value="rear_left_wheel_joint"/>
+        <param name="rear_right_wheel_command_joint_name" value="rear_right_wheel_joint"/>
+        <param name="front_left_wheel_state_joint_name" value="front_left_wheel_joint"/>
+        <param name="front_right_wheel_state_joint_name" value="front_right_wheel_joint"/>
+        <param name="rear_left_wheel_state_joint_name" value="rear_left_wheel_joint"/>
+        <param name="rear_right_wheel_state_joint_name" value="rear_right_wheel_joint"/>
+        <param name="wheel_radius" value="0.05"/>
+        <param name="wheel_separation_x" value="0.3"/>
+        <param name="wheel_separation_y" value="0.25"/>
+        <param name="command_interface" value="['velocity']"/>
+        <param name="state_interface" value="['velocity']"/>
+        <param name="publish_rate" value="50.0"/>
+      </parameters> -->
+    </ros>
+  </controller>
   <!-- 摄像头安装的z坐标:底盘高度 / 2 + 摄像头高度 / 2  -->
   <!-- 摄像头质量 -->
   <!-- 摄像头关节以及link -->
@@ -195,7 +219,7 @@
   <link name="support">
     <visual>
       <geometry>
-        <cylinder length="0.15" radius="0.01"/>
+        <cylinder length="0.05" radius="0.01"/>
       </geometry>
       <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
       <material name="red">
@@ -204,24 +228,23 @@
     </visual>
     <collision>
       <geometry>
-        <cylinder length="0.15" radius="0.01"/>
+        <cylinder length="0.05" radius="0.01"/>
       </geometry>
       <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
     </collision>
     <inertial>
       <mass value="0.02"/>
-      <inertia ixx="3.8e-05" ixy="0" ixz="0" iyy="3.8e-05" iyz="0" izz="1.0000000000000002e-06"/>
+      <inertia ixx="4.666666666666667e-06" ixy="0" ixz="0" iyy="4.666666666666667e-06" iyz="0" izz="1.0000000000000002e-06"/>
     </inertial>
   </link>
   <joint name="support2base_link" type="fixed">
     <parent link="base_link"/>
     <child link="support"/>
-    <origin xyz="0.0 0.0 0.11499999999999999"/>
+    <origin xyz="0.0 0.0 0.065"/>
   </joint>
   <gazebo reference="support">
     <material>Gazebo/White</material>
   </gazebo>
-  <!-- 雷达安装的z坐标:支架高度 / 2 + 雷达高度 / 2  -->
   <!-- 雷达质量 -->
   <!-- 雷达关节以及link -->
   <link name="laser">
@@ -246,31 +269,9 @@
   <joint name="laser2support" type="fixed">
     <parent link="support"/>
     <child link="laser"/>
-    <origin xyz="0.0 0.0 0.1"/>
+    <origin xyz="0.0 0.0 0.05"/>
   </joint>
   <gazebo reference="laser">
     <material>Gazebo/Black</material>
-  </gazebo>
-  <!-- 接口声明 -->
-  <ros2_control name="GazeboSystem" type="system">
-    <hardware>
-      <plugin>gazebo_ros2_control/GazeboSystem</plugin>
-    </hardware>
-    <joint name="left_wheel2base_link">
-      <command_interface name="velocity"/>
-      <state_interface name="position"/>
-      <state_interface name="velocity"/>
-    </joint>
-    <joint name="right_wheel2base_link">
-      <command_interface name="velocity"/>
-      <state_interface name="position"/>
-      <state_interface name="velocity"/>
-    </joint>
-  </ros2_control>
-  <!-- ros2_control 插件加载 -->
-  <gazebo>
-    <plugin filename="libgazebo_ros2_control.so" name="gazebo_ros2_control">
-      <parameters>/home/hiro/ros2/AIC_car_2025/install/robot_gazebo/share/robot_gazebo/config/ros2_config.yaml</parameters>
-    </plugin>
   </gazebo>
 </robot>

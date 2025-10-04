@@ -1,0 +1,34 @@
+ps aux | grep gz
+ros2 run xacro xacro robot.urdf.xacro -o robot.urdf
+
+colcon build --symlink-install --packages-select robot_gazebo
+ros2 launch robot_gazebo test.py
+ros2 launch robot_gazebo robot.launch.py
+
+ros2 control load_controller --set-state active mecanum_controller
+ros2 param list /controller_manager
+ros2 param get /controller_manager mecanum_controller.type
+ros2 param set /controller_manager mecanum_controller.type mecanum_drive_controller/MecanumDriveController
+ros2 param set /controller_manager mecanum_controller.kinematics.wheel_radius 0.05
+
+ros2 run controller_manager spawner mecanum_controller \
+    --param-file /home/hiro/ros2/AIC_car_2025/robot_gazebo/urdf/mecanum_controllers.yaml
+    --set-state active
+
+ros2 run controller_manager ros2_control_node \
+  --ros-args \
+  -r __node:=controller_manager \
+  --params-file /home/hiro/ros2/AIC_car_2025/install/robot_gazebo/share/robot_gazebo/urdf/mecanum_controllers.yaml
+
+ros2 control load_controller --set-state active mecanum_controller --param-file /home/hiro/ros2/AIC_car_2025/robot_gazebo/urdf/mecanum_controllers.yaml
+ros2 run controller_manager spawner mecanum_controller --param /home/hiro/ros2/AIC_car_2025/robot_gazebo/urdf/mecanum_controllers.yaml
+
+ros2 topic pub -r 10 /mecanum_controller/cmd_vel geometry_msgs/msg/Twist "
+linear:
+  x: 0.3
+  y: 0.0
+  z: 0.0
+angular:
+  x: 0.0
+  y: 0.0
+  z: 0.0"

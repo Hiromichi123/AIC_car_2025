@@ -1,28 +1,58 @@
 <robot name="my_car_move" xmlns:xacro="http://www.ros.org/wiki/xacro">
-  <!-- 接口声明 -->
+  <!-- ========== 引用 my_base 的底盘和轮子属性 ========== -->
+  <xacro:include filename="my_base.urdf.xacro"/>
+  <xacro:my_base />
+
+  <!-- ========== ros2_control 定义 ========== -->
   <ros2_control name="GazeboSystem" type="system">
     <hardware>
-        <plugin>gazebo_ros2_control/GazeboSystem</plugin>
+      <plugin>gazebo_ros2_control/GazeboSystem</plugin>
     </hardware>
 
-    <joint name="left_wheel2base_link">
+    <!-- 四个麦轮 joint -->
+    <joint name="front_left_wheel_joint">
       <command_interface name="velocity"/>
-      <state_interface name="position"/>
       <state_interface name="velocity"/>
     </joint>
-
-    <joint name="right_wheel2base_link">
+    <joint name="front_right_wheel_joint">
       <command_interface name="velocity"/>
-      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+    <joint name="rear_left_wheel_joint">
+      <command_interface name="velocity"/>
+      <state_interface name="velocity"/>
+    </joint>
+    <joint name="rear_right_wheel_joint">
+      <command_interface name="velocity"/>
       <state_interface name="velocity"/>
     </joint>
   </ros2_control>
 
-  <!-- ros2_control 插件加载 -->
   <gazebo>
-  <plugin name="gazebo_ros2_control" filename="libgazebo_ros2_control.so">
-    <parameters>$(find robot_gazebo)/config/ros2_config.yaml</parameters>
-  </plugin>
-</gazebo>
+    <plugin name="gazebo_ros2_control" filename="libgazebo_ros2_control.so">
+      <parameters>/home/hiro/ros2/AIC_car_2025/robot_gazebo/urdf/mecanum_controllers.yaml</parameters>
+    </plugin>
+  </gazebo>
 
+  <controller name="mecanum_controller" type="mecanum_drive_controller/MecanumDriveController">
+    <ros>
+      <namespace>/</namespace>
+      <!-- <parameters>
+        <param name="front_left_wheel_command_joint_name" value="front_left_wheel_joint"/>
+        <param name="front_right_wheel_command_joint_name" value="front_right_wheel_joint"/>
+        <param name="rear_left_wheel_command_joint_name" value="rear_left_wheel_joint"/>
+        <param name="rear_right_wheel_command_joint_name" value="rear_right_wheel_joint"/>
+        <param name="front_left_wheel_state_joint_name" value="front_left_wheel_joint"/>
+        <param name="front_right_wheel_state_joint_name" value="front_right_wheel_joint"/>
+        <param name="rear_left_wheel_state_joint_name" value="rear_left_wheel_joint"/>
+        <param name="rear_right_wheel_state_joint_name" value="rear_right_wheel_joint"/>
+        <param name="wheel_radius" value="0.05"/>
+        <param name="wheel_separation_x" value="0.3"/>
+        <param name="wheel_separation_y" value="0.25"/>
+        <param name="command_interface" value="['velocity']"/>
+        <param name="state_interface" value="['velocity']"/>
+        <param name="publish_rate" value="50.0"/>
+      </parameters> -->
+    </ros>
+  </controller>
 </robot>

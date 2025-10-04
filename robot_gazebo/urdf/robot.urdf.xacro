@@ -1,8 +1,21 @@
 <robot name="my_robot" xmlns:xacro="http://wiki.ros.org/xacro">
+    <!-- 全局参数 -->
+    <xacro:property name="PI" value="3.1415926"/>
+    <xacro:property name="base_link_length" value="0.08"/>
+    <xacro:property name="base_link_radius" value="0.1"/>
+    <xacro:property name="wheel_radius" value="0.0325"/>
+    <xacro:property name="wheel_length" value="0.02"/>
+    <xacro:property name="wheel_x_offset" value="0.12"/>
+    <xacro:property name="wheel_y_offset" value="0.10"/>
+    <xacro:property name="earth_space" value="0.015"/>
+    <xacro:property name="base_link_m" value="0.5"/>
+    <xacro:property name="wheel_m" value="0.1"/>
+    <xacro:property name="camera_height" value="0.05"/>
+
+    <!-- 引入 xacro 文件 -->
     <xacro:include filename="cylinder_inertial_matrix.urdf.xacro" />
-    <!-- <xacro:include filename="my_head.urdf.xacro" /> -->
     <xacro:include filename="my_base.urdf.xacro" />
+    <xacro:include filename="move.urdf.xacro" />
     <xacro:include filename="my_camera.urdf.xacro" />
     <xacro:include filename="my_laser.urdf.xacro" />
-    <xacro:include filename="move.urdf.xacro" />
 </robot>

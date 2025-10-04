@@ -13,11 +13,8 @@
     </include>
     <include>
       <uri>model://aic_plane</uri>
+      <pose>1.65 1.65 0.0 0 0 3.1415</pose>
     </include>
-
-    <!-- 必须的 ROS 插件 -->
-    <!-- <plugin name="gazebo_ros_factory" filename="/opt/ros/humble/lib/libgazebo_ros_factory.so"/>
-    <plugin name="gazebo_ros_init" filename="/opt/ros/humble/lib/libgazebo_ros_init.so"/> -->
 
     <!-- 物理引擎参数 -->
     <physics name='default_physics' default='0' type='ode'>

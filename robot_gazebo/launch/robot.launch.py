@@ -9,6 +9,7 @@ def generate_launch_description():
     world_file = os.path.join(pkg_path, '..', 'worlds', 'empty.world')
     urdf_xacro = os.path.join(pkg_path, '..', 'urdf', 'robot.urdf.xacro')
     urdf_file = os.path.join(pkg_path, '..', 'urdf', 'robot.urdf')
+    yaml_file = os.path.join(pkg_path, '..', 'urdf', 'mecanum_controllers.yaml')
 
     # xacro 生成 urdf
     xacro_urdf_process = ExecuteProcess(
@@ -22,18 +23,7 @@ def generate_launch_description():
         executable='robot_state_publisher',
         name='robot_state_publisher',
         output='screen',
-        parameters=[{'robot_description': open(urdf_file).read()}]
-    )
-
-    # 传递参数文件到 controller_manager
-    controller_manager = Node(
-        package="controller_manager",
-        executable="ros2_control_node",
-        parameters=[
-            {"robot_description": Command(['xacro ', "/home/hiro/ros2/AIC_car_2025/install/robot_gazebo/share/robot_gazebo/urdf/robot.urdf.xacro"])},
-            "/home/hiro/ros2/AIC_car_2025/install/robot_gazebo/share/robot_gazebo/config/ros2_config.yaml",
-        ],
-        output="screen"
+        parameters=[{'robot_description': Command(['xacro ', urdf_xacro])}]
     )
 
     # 启动 Gazebo
@@ -41,7 +31,8 @@ def generate_launch_description():
         cmd=['gazebo', 
             '-s', 'libgazebo_ros_factory.so',
             '-s', 'libgazebo_ros_init.so',
-            world_file],
+            world_file,
+        ],
         output='screen'
     )
 
@@ -50,90 +41,30 @@ def generate_launch_description():
         package='gazebo_ros',
         executable='spawn_entity.py',
         arguments=[
-            '-topic', 'robot_description',  # 从参数服务器获取URDF
+            '-topic', 'robot_description',
             '-entity', 'mycar',
-            '-x', '1.65',
-            '-y', '1.65',
-            '-z', '0.05'
+            '-x', '0.00',
+            '-y', '0.00',
+            '-z', '0.02'
         ],
         output='screen'
     )
-    delayed_spawn = TimerAction(period=5.0, actions=[spawn_entity_node]) # 延迟5秒启动
+    spawn_entity_node = TimerAction(period=5.0, actions=[spawn_entity_node]) # 延迟5秒启动
 
-    # 手动设置diff_drive_base_controller参数
-    set_params = TimerAction(
-        period=25.0,
-        actions=[
-            ExecuteProcess(
-                cmd=['ros2', 'param', 'set', '/controller_manager', 'diff_drive_base_controller.type',
-                     'diff_drive_controller/DiffDriveController'],
-                output='screen'
-            ),
-            ExecuteProcess(
-                cmd=['ros2', 'param', 'set', '/controller_manager', 'diff_drive_base_controller.left_wheel_names',
-                     "['left_wheel2base_link']"],
-                output='screen'
-            ),
-            ExecuteProcess(
-                cmd=['ros2', 'param', 'set', '/controller_manager', 'diff_drive_base_controller.right_wheel_names',
-                     "['right_wheel2base_link']"],
-                output='screen'
-            ),
-            ExecuteProcess(
-                cmd=['ros2', 'param', 'set', '/controller_manager', 'diff_drive_base_controller.wheel_separation', 
-                     '0.2'],
-                output='screen'
-            ),
-            ExecuteProcess(
-                cmd=['ros2', 'param', 'set', '/controller_manager', 'diff_drive_base_controller.wheel_radius', 
-                     '0.0325'],
-                output='screen'
-            ),
-            ExecuteProcess(
-                cmd=['ros2', 'param', 'set', '/controller_manager', 'diff_drive_base_controller.publish_rate', 
-                     '50.0'],
-                output='screen'
-            ),
-            ExecuteProcess(
-                cmd=['ros2', 'param', 'set', '/controller_manager', 'diff_drive_base_controller.enable_odom_tf', 
-                     'true'],
-                output='screen'
-            ),
-            ExecuteProcess(
-                cmd=['ros2', 'param', 'set', '/controller_manager', 'diff_drive_base_controller.cmd_vel_timeout', 
-                     '0.25'],
-                output='screen'
-            ),
-            ExecuteProcess(
-                cmd=['ros2', 'param', 'set', '/controller_manager', 'diff_drive_base_controller.odom_frame_id', 
-                     'odom'],
-                output='screen'
-            ),
-            ExecuteProcess(
-                cmd=['ros2', 'param', 'set', '/controller_manager', 'diff_drive_base_controller.base_frame_id', 
-                     'base_footprint'],
-                output='screen'
-            )
-        ]
+    mecanum_controller_spawner = ExecuteProcess(
+        cmd=[
+            'ros2', 'run', 'controller_manager', 'spawner',
+            'mecanum_controller',
+            '--param', '/home/hiro/ros2/AIC_car_2025/robot_gazebo/urdf/mecanum_controllers.yaml'
+        ],
+        output='screen'
     )
-
-    # 加载并启动差速驱动控制器
-    load_controller = TimerAction(
-        period=35.0,
-        actions=[
-            ExecuteProcess(
-                cmd=['ros2', 'control', 'load_controller', '--set-state', 'active', 'diff_drive_base_controller'],
-                output='screen'
-            )
-        ]
-    )
+    mecanum_controller_spawner = TimerAction(period=10.0, actions=[mecanum_controller_spawner]) # 延迟10秒启动
 
     return LaunchDescription([
         xacro_urdf_process,
         robot_description,
-        controller_manager,
         gazebo_process,
-        delayed_spawn,
-        set_params,
-        load_controller
+        spawn_entity_node,
+        mecanum_controller_spawner
     ])
