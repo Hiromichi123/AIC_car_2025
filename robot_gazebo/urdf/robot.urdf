@@ -26,26 +26,26 @@
   <link name="front_left_wheel">
     <visual>
       <geometry>
-        <cylinder length="0.02" radius="0.0325"/>
+        <cylinder length="0.02" radius="0.05"/>
       </geometry>
       <origin rpy="1.5707963 0 0" xyz="0 0 0"/>
       <material name="yellow"/>
     </visual>
     <collision>
       <geometry>
-        <cylinder length="0.02" radius="0.0325"/>
+        <cylinder length="0.02" radius="0.05"/>
       </geometry>
       <origin rpy="1.5707963 0 0" xyz="0 0 0"/>
     </collision>
     <inertial>
-      <mass value="0.1"/>
-      <inertia ixx="2.9739583333333336e-05" ixy="0" ixz="0" iyy="2.9739583333333336e-05" iyz="0" izz="5.281250000000001e-05"/>
+      <mass value="0.05"/>
+      <inertia ixx="3.291666666666667e-05" ixy="0" ixz="0" iyy="3.291666666666667e-05" iyz="0" izz="6.250000000000001e-05"/>
     </inertial>
   </link>
   <joint name="front_left_wheel_joint" type="continuous">
     <parent link="base_link"/>
     <child link="front_left_wheel"/>
-    <origin rpy="0 0 0" xyz="0.12 0.1 -0.0225"/>
+    <origin rpy="0 0 0" xyz="0.05 0.05 -0.0049999999999999975"/>
     <axis xyz="0 1 0"/>
   </joint>
   <gazebo reference="front_left_wheel">
@@ -54,26 +54,26 @@
   <link name="front_right_wheel">
     <visual>
       <geometry>
-        <cylinder length="0.02" radius="0.0325"/>
+        <cylinder length="0.02" radius="0.05"/>
       </geometry>
       <origin rpy="1.5707963 0 0" xyz="0 0 0"/>
       <material name="yellow"/>
     </visual>
     <collision>
       <geometry>
-        <cylinder length="0.02" radius="0.0325"/>
+        <cylinder length="0.02" radius="0.05"/>
       </geometry>
       <origin rpy="1.5707963 0 0" xyz="0 0 0"/>
     </collision>
     <inertial>
-      <mass value="0.1"/>
-      <inertia ixx="2.9739583333333336e-05" ixy="0" ixz="0" iyy="2.9739583333333336e-05" iyz="0" izz="5.281250000000001e-05"/>
+      <mass value="0.05"/>
+      <inertia ixx="3.291666666666667e-05" ixy="0" ixz="0" iyy="3.291666666666667e-05" iyz="0" izz="6.250000000000001e-05"/>
     </inertial>
   </link>
   <joint name="front_right_wheel_joint" type="continuous">
     <parent link="base_link"/>
     <child link="front_right_wheel"/>
-    <origin rpy="0 0 0" xyz="0.12 -0.1 -0.0225"/>
+    <origin rpy="0 0 0" xyz="0.05 -0.05 -0.0049999999999999975"/>
     <axis xyz="0 1 0"/>
   </joint>
   <gazebo reference="front_right_wheel">
@@ -82,26 +82,26 @@
   <link name="rear_left_wheel">
     <visual>
       <geometry>
-        <cylinder length="0.02" radius="0.0325"/>
+        <cylinder length="0.02" radius="0.05"/>
       </geometry>
       <origin rpy="1.5707963 0 0" xyz="0 0 0"/>
       <material name="yellow"/>
     </visual>
     <collision>
       <geometry>
-        <cylinder length="0.02" radius="0.0325"/>
+        <cylinder length="0.02" radius="0.05"/>
       </geometry>
       <origin rpy="1.5707963 0 0" xyz="0 0 0"/>
     </collision>
     <inertial>
-      <mass value="0.1"/>
-      <inertia ixx="2.9739583333333336e-05" ixy="0" ixz="0" iyy="2.9739583333333336e-05" iyz="0" izz="5.281250000000001e-05"/>
+      <mass value="0.05"/>
+      <inertia ixx="3.291666666666667e-05" ixy="0" ixz="0" iyy="3.291666666666667e-05" iyz="0" izz="6.250000000000001e-05"/>
     </inertial>
   </link>
   <joint name="rear_left_wheel_joint" type="continuous">
     <parent link="base_link"/>
     <child link="rear_left_wheel"/>
-    <origin rpy="0 0 0" xyz="-0.12 0.1 -0.0225"/>
+    <origin rpy="0 0 0" xyz="-0.05 0.05 -0.0049999999999999975"/>
     <axis xyz="0 1 0"/>
   </joint>
   <gazebo reference="rear_left_wheel">
@@ -110,26 +110,26 @@
   <link name="rear_right_wheel">
     <visual>
       <geometry>
-        <cylinder length="0.02" radius="0.0325"/>
+        <cylinder length="0.02" radius="0.05"/>
       </geometry>
       <origin rpy="1.5707963 0 0" xyz="0 0 0"/>
       <material name="yellow"/>
     </visual>
     <collision>
       <geometry>
-        <cylinder length="0.02" radius="0.0325"/>
+        <cylinder length="0.02" radius="0.05"/>
       </geometry>
       <origin rpy="1.5707963 0 0" xyz="0 0 0"/>
     </collision>
     <inertial>
-      <mass value="0.1"/>
-      <inertia ixx="2.9739583333333336e-05" ixy="0" ixz="0" iyy="2.9739583333333336e-05" iyz="0" izz="5.281250000000001e-05"/>
+      <mass value="0.05"/>
+      <inertia ixx="3.291666666666667e-05" ixy="0" ixz="0" iyy="3.291666666666667e-05" iyz="0" izz="6.250000000000001e-05"/>
     </inertial>
   </link>
   <joint name="rear_right_wheel_joint" type="continuous">
     <parent link="base_link"/>
     <child link="rear_right_wheel"/>
-    <origin rpy="0 0 0" xyz="-0.12 -0.1 -0.0225"/>
+    <origin rpy="0 0 0" xyz="-0.05 -0.05 -0.0049999999999999975"/>
     <axis xyz="0 1 0"/>
   </joint>
   <gazebo reference="rear_right_wheel">
@@ -273,5 +273,12 @@
   </joint>
   <gazebo reference="laser">
     <material>Gazebo/Black</material>
+  </gazebo>
+  <!-- 加载绝对位姿获取插件 -->
+  <gazebo>
+    <plugin filename="libodom_plugin.so" name="odom_plugin">
+      <topic_name>/absolute_pose</topic_name>
+      <publish_rate>50</publish_rate>
+    </plugin>
   </gazebo>
 </robot>

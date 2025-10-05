@@ -1,4 +1,5 @@
 ps aux | grep gz
+pkill -9 gz
 ros2 run xacro xacro robot.urdf.xacro -o robot.urdf
 
 colcon build --symlink-install --packages-select robot_gazebo

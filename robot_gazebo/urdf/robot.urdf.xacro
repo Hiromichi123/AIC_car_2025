@@ -3,13 +3,13 @@
     <xacro:property name="PI" value="3.1415926"/>
     <xacro:property name="base_link_length" value="0.08"/>
     <xacro:property name="base_link_radius" value="0.1"/>
-    <xacro:property name="wheel_radius" value="0.0325"/>
+    <xacro:property name="wheel_radius" value="0.04"/>
     <xacro:property name="wheel_length" value="0.02"/>
-    <xacro:property name="wheel_x_offset" value="0.12"/>
-    <xacro:property name="wheel_y_offset" value="0.10"/>
+    <xacro:property name="wheel_x_offset" value="0.05"/>
+    <xacro:property name="wheel_y_offset" value="0.05"/>
     <xacro:property name="earth_space" value="0.015"/>
-    <xacro:property name="base_link_m" value="0.5"/>
-    <xacro:property name="wheel_m" value="0.1"/>
+    <xacro:property name="base_link_m" value="0.2"/>
+    <xacro:property name="wheel_m" value="0.05"/>
     <xacro:property name="camera_height" value="0.05"/>
 
     <!-- 引入 xacro 文件 -->
@@ -18,4 +18,12 @@
     <xacro:include filename="move.urdf.xacro" />
     <xacro:include filename="my_camera.urdf.xacro" />
     <xacro:include filename="my_laser.urdf.xacro" />
+
+    <!-- 加载绝对位姿获取插件 -->
+    <gazebo>
+      <plugin name="odom_plugin" filename="libodom_plugin.so">
+        <topic_name>/absolute_pose</topic_name>
+        <publish_rate>50</publish_rate>
+      </plugin>
+    </gazebo>
 </robot>

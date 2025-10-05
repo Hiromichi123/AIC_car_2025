@@ -20,6 +20,8 @@
   <depend>cv_bridge</depend>
   <depend>OpenCV</depend>
   <depend>realsense2</depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
 
   <member_of_group>rosidl_interface_packages</member_of_group>
   
