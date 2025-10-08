@@ -29,7 +29,7 @@
 
   <gazebo>
     <plugin name="gazebo_ros2_control" filename="libgazebo_ros2_control.so">
-      <parameters>/home/hiro/ros2/AIC_car_2025/robot_gazebo/urdf/mecanum_controllers.yaml</parameters>
+      <parameters>$(find robot_gazebo)/urdf/mecanum_controllers.yaml</parameters>
     </plugin>
   </gazebo>
 

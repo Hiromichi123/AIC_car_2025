@@ -1,6 +1,7 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.actions import ExecuteProcess, TimerAction
+from launch.actions import ExecuteProcess, TimerAction, RegisterEventHandler
+from launch.event_handlers import OnProcessExit
 from launch.substitutions import Command
 import os
 
@@ -8,14 +9,6 @@ def generate_launch_description():
     pkg_path = os.path.dirname(os.path.abspath(__file__))
     world_file = os.path.join(pkg_path, '..', 'worlds', 'empty.world')
     urdf_xacro = os.path.join(pkg_path, '..', 'urdf', 'robot.urdf.xacro')
-    urdf_file = os.path.join(pkg_path, '..', 'urdf', 'robot.urdf')
-    yaml_file = os.path.join(pkg_path, '..', 'urdf', 'mecanum_controllers.yaml')
-
-    # xacro 生成 urdf
-    xacro_urdf_process = ExecuteProcess(
-        cmd=['ros2', 'run', 'xacro', 'xacro', urdf_xacro, '-o', urdf_file],
-        output='screen'
-    )
 
     # 发布 robot_description
     robot_description = Node(
@@ -36,7 +29,7 @@ def generate_launch_description():
         output='screen'
     )
 
-    # 使用参数服务器加载URDF
+    # 生成机器人实体
     spawn_entity_node = Node(
         package='gazebo_ros',
         executable='spawn_entity.py',
@@ -49,22 +42,31 @@ def generate_launch_description():
         ],
         output='screen'
     )
-    spawn_entity_node = TimerAction(period=5.0, actions=[spawn_entity_node]) # 延迟5秒启动
 
-    mecanum_controller_spawner = ExecuteProcess(
-        cmd=[
-            'ros2', 'run', 'controller_manager', 'spawner',
-            'mecanum_controller',
-            '--param', '/home/hiro/ros2/AIC_car_2025/robot_gazebo/urdf/mecanum_controllers.yaml'
-        ],
+    # 使用 spawner 加载控制器（正确的方法）
+    load_mecanum_controller = Node(
+        package='controller_manager',
+        executable='spawner',
+        arguments=['mecanum_controller'],
         output='screen'
     )
-    mecanum_controller_spawner = TimerAction(period=10.0, actions=[mecanum_controller_spawner]) # 延迟10秒启动
+
+    # 在机器人生成后延迟加载控制器
+    load_controller_event = RegisterEventHandler(
+        event_handler=OnProcessExit(
+            target_action=spawn_entity_node,
+            on_exit=[
+                TimerAction(
+                    period=2.0,
+                    actions=[load_mecanum_controller]
+                )
+            ]
+        )
+    )
 
     return LaunchDescription([
-        xacro_urdf_process,
         robot_description,
         gazebo_process,
-        spawn_entity_node,
-        #mecanum_controller_spawner
+        TimerAction(period=5.0, actions=[spawn_entity_node]),
+        load_controller_event
     ])
