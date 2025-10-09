@@ -21,6 +21,7 @@ pub struct Navi {
     pub velocity: Pos,
     pub is_arrived: bool,
     arrive_threshold: f64,
+    current_waypoint_index: usize, // 当前目标点索引
 }
 
 pub struct NaviSubNode {
@@ -53,42 +54,102 @@ impl Navi {
         Navi::default()
     }
 
-    pub fn set_dest(&mut self, dest: &Pos, threshold: f64) {
-        match self.dest_pos {
-            None => {
-                self.dest_pos.push(*dest);
-                self.arrive_threshold = threshold;
-                self.is_arrived = false;
-                log_info!("set dest", "destination set to {:?}", dest);
-            }
-            Some(_) => {
-                log_info!("set dest", "car not arrived!");
-            }
+    /// 设置一系列目标点
+    fn set_destinations(&mut self, destinations: Vec<Pos>, threshold: f64) {
+        if !destinations.is_empty() {
+            self.dest_pos = destinations;
+            self.arrive_threshold = threshold;
+            self.is_arrived = false;
+            self.current_waypoint_index = 0;
+            log_info!(
+                "set destinations",
+                "set {} waypoints, threshold: {:.2}",
+                self.dest_pos.len(),
+                threshold
+            );
+        } else {
+            log_info!("set destinations", "empty destination list provided");
         }
     }
 
+    /// 获取当前目标点
+    fn get_current_destination(&self) -> Option<&Pos> {
+        self.dest_pos.get(self.current_waypoint_index)
+    }
+
+    /// 更新位置并检查是否到达当前目标点
     fn update(&mut self, current_pos: Pos) -> Option<bool> {
         self.current_pos = current_pos;
 
-        let dest_pos = match &self.dest_pos {
+        // 检查是否还有目标点
+        let dest_pos = match self.get_current_destination() {
             Some(pos) => pos,
             None => {
-                log_info!("navi update", "dest not set");
+                if self.dest_pos.is_empty() {
+                    log_info!("navi update", "no destinations set");
+                } else {
+                    log_info!("navi update", "all waypoints reached");
+                    self.is_arrived = true;
+                }
                 return None;
             }
         };
 
         let distance = dest_pos
             .translation
-            .cal_distance(&self.current_pos.translation);
-        if !self.is_arrived && distance <= self.arrive_threshold {
-            self.is_arrived = true;
-            self.dest_pos = None; // for moving interval check
-            log_info!("pos update", "car arrived!");
-            return Some(true);
+            .cal_distance(&self.current_pos.translation)
+            + dest_pos.rotation.cal_distance(&self.current_pos.rotation);
+
+        if distance <= self.arrive_threshold {
+            self.current_waypoint_index += 1;
+
+            if self.current_waypoint_index >= self.dest_pos.len() {
+                // 所有点都到达了
+                self.is_arrived = true;
+                log_info!(
+                    "pos update",
+                    "reached final waypoint! Total: {}",
+                    self.dest_pos.len()
+                );
+                return Some(true);
+            } else {
+                // 到达当前点，继续下一个
+                log_info!(
+                    "pos update",
+                    "reached waypoint {}/{}, moving to next",
+                    self.current_waypoint_index,
+                    self.dest_pos.len()
+                );
+                return Some(false);
+            }
         } else {
-            log_info!("pos update", "dest distance: {distance}");
+            log_info!(
+                "pos update",
+                "waypoint {}/{}, distance: {:.2}m",
+                self.current_waypoint_index + 1,
+                self.dest_pos.len(),
+                distance
+            );
             return Some(false);
+        }
+    }
+
+    /// 清除所有目标点
+    pub fn clear_destinations(&mut self) {
+        self.dest_pos.clear();
+        self.current_waypoint_index = 0;
+        self.is_arrived = false;
+        log_info!("clear destinations", "all destinations cleared");
+    }
+
+    /// 获取剩余路径点数量
+    pub fn remaining_waypoints(&self) -> usize {
+        if self.dest_pos.is_empty() {
+            0
+        } else {
+            self.dest_pos
+                .len()
+                .saturating_sub(self.current_waypoint_index)
         }
     }
 }
@@ -108,9 +169,18 @@ impl NaviSubNode {
             worker.create_subscription::<LidarPose, _>(topic, move |msg: LidarPose| {
                 log_info!("navi worker", "received lidar pos: {:?}", msg);
                 if let Ok(mut navi) = navi_instance_clone.lock() {
-                    if navi.update(msg.into()) == Some(false) {
-                        NaviSubNode::publish_goal_with(&goal_pub_clone, &*navi);
-                    };
+                    match navi.update(msg.into()) {
+                        Some(true) => {
+                            log_info!("navi worker", "navigation completed!");
+                        }
+                        Some(false) => {
+                            // 继续导航，发布当前目标点
+                            let _ = NaviSubNode::publish_goal_with(&goal_pub_clone, &*navi);
+                        }
+                        None => {
+                            // 没有目标点
+                        }
+                    }
                 };
             })?;
 
@@ -122,7 +192,7 @@ impl NaviSubNode {
     }
 
     fn publish_goal_with(publisher: &Publisher<PoseStamped>, navi: &Navi) -> anyhow::Result<()> {
-        let dest = match navi.dest_pos {
+        let dest = match navi.get_current_destination() {
             Some(dest) => dest,
             None => {
                 log_info!("navi", "No destination set; skipping publish");
@@ -150,7 +220,9 @@ impl NaviSubNode {
         publisher.publish(goal_msg)?;
         log_info!(
             "navi",
-            "Published goal: ({:.2}, {:.2}, yaw: {:.2})",
+            "Published goal {}/{}: ({:.2}, {:.2}, yaw: {:.2})",
+            navi.current_waypoint_index + 1,
+            navi.dest_pos.len(),
             x,
             y,
             yaw
@@ -159,56 +231,27 @@ impl NaviSubNode {
         Ok(())
     }
 
-    pub fn publish_goal(&self, navi: &Navi) -> anyhow::Result<()> {
-        let dest = match navi.dest_pos {
-            Some(dest) => dest,
-            None => {
-                log_info!("navi", "No destination set; skipping publish");
-                return Ok(());
-            }
-        };
-
-        let x = dest.translation.0;
-        let y = dest.translation.1;
-        let z = dest.translation.2;
-        let yaw = dest.rotation.2;
-
-        let mut goal_msg = PoseStamped::default();
-        goal_msg.header.frame_id = "odom".to_string();
-        goal_msg.pose.position.x = x;
-        goal_msg.pose.position.y = y;
-        goal_msg.pose.position.z = z;
-
-        // 将yaw转换为四元数
-        let qw = (yaw / 2.0).cos();
-        let qz = (yaw / 2.0).sin();
-        goal_msg.pose.orientation.w = qw;
-        goal_msg.pose.orientation.z = qz;
-
-        self.goal_publisher.publish(goal_msg)?;
-        log_info!(
-            "navi",
-            "Published goal: ({:.2}, {:.2}, yaw: {:.2})",
-            x,
-            y,
-            yaw
-        );
-
-        Ok(())
+    pub fn publish_goal(&self) -> anyhow::Result<()> {
+        if let Ok(navi) = self.navi_instance.lock() {
+            Self::publish_goal_with(&self.goal_publisher, &*navi)
+        } else {
+            Err(anyhow::anyhow!("Failed to acquire navigation lock"))
+        }
     }
 
-    pub fn set_destination(&self, dest: Vec<Pos>, threshold: f64) -> anyhow::Result<()> {
+    /// 设置导航目标点列表
+    pub fn set_destinations(&self, destinations: Vec<Pos>, threshold: f64) -> anyhow::Result<()> {
         if let Ok(mut navi) = self.navi_instance.lock() {
-            let mut dest_iter = dest.iter();
-            while let Some(dest_point) = dest_iter.next() {
-                navi.set_dest(dest_point, threshold);
-            }
+            navi.set_destinations(destinations, threshold);
+            // 立即发布第一个目标点
+            Self::publish_goal_with(&self.goal_publisher, &*navi)?;
             Ok(())
         } else {
             Err(anyhow::anyhow!("Failed to acquire navigation lock"))
         }
     }
 
+    /// 是否完成所有导航
     pub fn is_arrived(&self) -> bool {
         self.navi_instance
             .lock()
@@ -216,7 +259,26 @@ impl NaviSubNode {
             .unwrap_or(false)
     }
 
+    /// 获取当前位置
     pub fn get_current_position(&self) -> Option<Pos> {
         self.navi_instance.lock().ok().map(|navi| navi.current_pos)
+    }
+
+    /// 获取剩余路径点数量
+    pub fn remaining_waypoints(&self) -> usize {
+        self.navi_instance
+            .lock()
+            .map(|navi| navi.remaining_waypoints())
+            .unwrap_or(0)
+    }
+
+    /// 清除所有目标点
+    pub fn clear_destinations(&self) -> anyhow::Result<()> {
+        if let Ok(mut navi) = self.navi_instance.lock() {
+            navi.clear_destinations();
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("Failed to acquire navigation lock"))
+        }
     }
 }
