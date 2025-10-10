@@ -1,7 +1,6 @@
 <robot name="my_car_move" xmlns:xacro="http://www.ros.org/wiki/xacro">
   <!-- ========== 引用 my_base 的底盘和轮子属性 ========== -->
   <xacro:include filename="my_base.urdf.xacro"/>
-  <xacro:my_base />
 
   <!-- ========== ros2_control 定义 ========== -->
   <ros2_control name="GazeboSystem" type="system">
@@ -37,22 +36,6 @@
   <controller name="mecanum_controller" type="mecanum_drive_controller/MecanumDriveController">
     <ros>
       <namespace>/</namespace>
-      <!-- <parameters>
-        <param name="front_left_wheel_command_joint_name" value="front_left_wheel_joint"/>
-        <param name="front_right_wheel_command_joint_name" value="front_right_wheel_joint"/>
-        <param name="rear_left_wheel_command_joint_name" value="rear_left_wheel_joint"/>
-        <param name="rear_right_wheel_command_joint_name" value="rear_right_wheel_joint"/>
-        <param name="front_left_wheel_state_joint_name" value="front_left_wheel_joint"/>
-        <param name="front_right_wheel_state_joint_name" value="front_right_wheel_joint"/>
-        <param name="rear_left_wheel_state_joint_name" value="rear_left_wheel_joint"/>
-        <param name="rear_right_wheel_state_joint_name" value="rear_right_wheel_joint"/>
-        <param name="wheel_radius" value="0.05"/>
-        <param name="wheel_separation_x" value="0.3"/>
-        <param name="wheel_separation_y" value="0.25"/>
-        <param name="command_interface" value="['velocity']"/>
-        <param name="state_interface" value="['velocity']"/>
-        <param name="publish_rate" value="50.0"/>
-      </parameters> -->
     </ros>
   </controller>
 </robot>

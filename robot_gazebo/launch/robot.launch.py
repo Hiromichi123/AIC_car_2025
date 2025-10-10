@@ -66,5 +66,5 @@ def generate_launch_description():
         robot_description,
         gazebo_process,
         spawn_entity_node,
-        mecanum_controller_spawner
+        #mecanum_controller_spawner
     ])

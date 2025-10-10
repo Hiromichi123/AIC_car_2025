@@ -179,55 +179,6 @@
   <gazebo reference="rear_right_wheel">
     <material>Gazebo/yellow</material>
   </gazebo>
-  <!-- ========== ros2_control 定义 ========== -->
-  <ros2_control name="GazeboSystem" type="system">
-    <hardware>
-      <plugin>gazebo_ros2_control/GazeboSystem</plugin>
-    </hardware>
-    <!-- 四个麦轮 joint -->
-    <joint name="front_left_wheel_joint">
-      <command_interface name="velocity"/>
-      <state_interface name="velocity"/>
-    </joint>
-    <joint name="front_right_wheel_joint">
-      <command_interface name="velocity"/>
-      <state_interface name="velocity"/>
-    </joint>
-    <joint name="rear_left_wheel_joint">
-      <command_interface name="velocity"/>
-      <state_interface name="velocity"/>
-    </joint>
-    <joint name="rear_right_wheel_joint">
-      <command_interface name="velocity"/>
-      <state_interface name="velocity"/>
-    </joint>
-  </ros2_control>
-  <gazebo>
-    <plugin filename="libgazebo_ros2_control.so" name="gazebo_ros2_control">
-      <parameters>/home/hiro/ros2/AIC_car_2025/robot_gazebo/urdf/mecanum_controllers.yaml</parameters>
-    </plugin>
-  </gazebo>
-  <controller name="mecanum_controller" type="mecanum_drive_controller/MecanumDriveController">
-    <ros>
-      <namespace>/</namespace>
-      <!-- <parameters>
-        <param name="front_left_wheel_command_joint_name" value="front_left_wheel_joint"/>
-        <param name="front_right_wheel_command_joint_name" value="front_right_wheel_joint"/>
-        <param name="rear_left_wheel_command_joint_name" value="rear_left_wheel_joint"/>
-        <param name="rear_right_wheel_command_joint_name" value="rear_right_wheel_joint"/>
-        <param name="front_left_wheel_state_joint_name" value="front_left_wheel_joint"/>
-        <param name="front_right_wheel_state_joint_name" value="front_right_wheel_joint"/>
-        <param name="rear_left_wheel_state_joint_name" value="rear_left_wheel_joint"/>
-        <param name="rear_right_wheel_state_joint_name" value="rear_right_wheel_joint"/>
-        <param name="wheel_radius" value="0.05"/>
-        <param name="wheel_separation_x" value="0.3"/>
-        <param name="wheel_separation_y" value="0.25"/>
-        <param name="command_interface" value="['velocity']"/>
-        <param name="state_interface" value="['velocity']"/>
-        <param name="publish_rate" value="50.0"/>
-      </parameters> -->
-    </ros>
-  </controller>
   <!-- 摄像头安装的z坐标:底盘高度 / 2 + 摄像头高度 / 2  -->
   <!-- 摄像头质量 -->
   <!-- 摄像头关节以及link -->
@@ -318,11 +269,22 @@
   <gazebo reference="laser">
     <material>Gazebo/Black</material>
   </gazebo>
-  <!-- 加载绝对位姿获取插件 -->
+  <!-- 绝对位姿获取插件 -->
   <gazebo>
     <plugin filename="libodom_plugin.so" name="odom_plugin">
       <topic_name>/absolute_pose</topic_name>
       <publish_rate>50</publish_rate>
+    </plugin>
+  </gazebo>
+  <!-- 平面移动插件 -->
+  <gazebo>
+    <plugin filename="libgazebo_ros_planar_move.so" name="planar_move_plugin">
+      <commandTopic>cmd_vel</commandTopic>
+      <odometryTopic>odom</odometryTopic>
+      <odometryFrame>odom</odometryFrame>
+      <odometryRate>50.0</odometryRate>
+      <robotBaseFrame>base_link</robotBaseFrame>
+      <update_rate>50</update_rate>
     </plugin>
   </gazebo>
 </robot>

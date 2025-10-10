@@ -15,15 +15,28 @@
     <!-- 引入 xacro 文件 -->
     <xacro:include filename="cylinder_inertial_matrix.urdf.xacro" />
     <xacro:include filename="my_base.urdf.xacro" />
-    <xacro:include filename="move.urdf.xacro" />
+    <xacro:my_base /> <!-- 调用宏来生成底盘 -->
+    <!-- <xacro:include filename="move.urdf.xacro" /> -->
     <xacro:include filename="my_camera.urdf.xacro" />
     <xacro:include filename="my_laser.urdf.xacro" />
 
-    <!-- 加载绝对位姿获取插件 -->
+    <!-- 绝对位姿获取插件 -->
     <gazebo>
       <plugin name="odom_plugin" filename="libodom_plugin.so">
         <topic_name>/absolute_pose</topic_name>
         <publish_rate>50</publish_rate>
+      </plugin>
+    </gazebo>
+
+    <!-- 平面移动插件 -->
+    <gazebo>
+      <plugin name="planar_move_plugin" filename="libgazebo_ros_planar_move.so">
+        <commandTopic>cmd_vel</commandTopic>
+        <odometryTopic>odom</odometryTopic>
+        <odometryFrame>odom</odometryFrame>
+        <odometryRate>50.0</odometryRate>
+        <robotBaseFrame>base_link</robotBaseFrame>
+        <update_rate>50</update_rate>
       </plugin>
     </gazebo>
 </robot>
