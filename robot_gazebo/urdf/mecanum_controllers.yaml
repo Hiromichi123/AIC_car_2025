@@ -14,8 +14,9 @@ mecanum_controller:
     rear_left_wheel_state_joint_name: "rear_left_wheel_joint"
     rear_right_wheel_state_joint_name: "rear_right_wheel_joint"
     kinematics:
-      wheels_radius: 0.05
-      sum_of_robot_center_projection_on_X_Y_axis: 0.45
+      wheels_radius: 0.05              # 轮子半径 5cm
+      wheel_separation_x: 0.10         # 前后轮间距 10cm
+      wheel_separation_y: 0.10         # 左右轮间距 10cm
     use_stamped_vel: true
     base_frame_id: "base_link"
     odom_frame_id: "odom"

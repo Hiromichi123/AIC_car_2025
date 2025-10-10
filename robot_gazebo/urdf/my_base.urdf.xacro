@@ -36,6 +36,15 @@
             <cylinder radius="${wheel_radius}" length="${wheel_length}" />
           </geometry>
           <origin xyz="0 0 0" rpy="${PI/2} 0 0" />
+          <!-- 添加摩擦力 -->
+          <surface>
+            <friction>
+              <ode>
+                <mu>0.2</mu>      <!-- 主摩擦系数 -->
+                <mu2>0.2</mu2>    <!-- 次摩擦系数 -->
+              </ode>
+            </friction>
+          </surface>
         </collision>
         <xacro:cylinder_inertial_matrix m="${wheel_m}" r="${wheel_radius}" h="${wheel_length}"/>
       </link>
