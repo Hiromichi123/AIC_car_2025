@@ -8,7 +8,7 @@
     <xacro:property name="wheel_x_offset" value="0.08"/>
     <xacro:property name="wheel_y_offset" value="0.08"/>
     <xacro:property name="earth_space" value="0.010"/>
-    <xacro:property name="base_link_m" value="0.2"/>
+    <xacro:property name="base_link_m" value="2.0"/>
     <xacro:property name="wheel_m" value="0.1"/>
     <xacro:property name="camera_height" value="0.05"/>
 
@@ -35,7 +35,7 @@
         <odometryTopic>odom</odometryTopic>
         <odometryFrame>odom</odometryFrame>
         <odometryRate>50.0</odometryRate>
-        <robotBaseFrame>base_link</robotBaseFrame>
+        <robotBaseFrame>base_footprint</robotBaseFrame>
         <update_rate>50</update_rate>
       </plugin>
     </gazebo>

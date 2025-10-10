@@ -24,7 +24,6 @@ public:
       "/lidar_data", 10,
       std::bind(&PositionController::lidarCallback, this, std::placeholders::_1));
 
-    // ✅ 修正：发布到 /cmd_vel，使用 Twist 消息
     cmd_pub_ = this->create_publisher<geometry_msgs::msg::Twist>(
       "/cmd_vel", 10);
 
@@ -36,7 +35,7 @@ private:
     latest_goal_ = *msg;
     has_goal_ = true;
     
-    // ✅ 检查是否有目标朝向
+    // 检查是否有目标朝向
     auto& q = msg->pose.orientation;
     if (fabs(q.x) > 0.001 || fabs(q.y) > 0.001 || 
         fabs(q.z) > 0.001 || fabs(q.w - 1.0) > 0.001) {
@@ -76,7 +75,7 @@ private:
     double dy_global = latest_goal_.pose.position.y - latest_pose_.pose.position.y;
     double distance = sqrt(dx_global * dx_global + dy_global * dy_global);
     
-    geometry_msgs::msg::Twist cmd;  // ✅ 使用 Twist，不是 TwistStamped
+    geometry_msgs::msg::Twist cmd;
 
     // 检查是否到达位置
     if (distance < position_threshold_) {
@@ -102,7 +101,7 @@ private:
       return;
     }
 
-    // ✅ 关键：先转向再移动的逻辑
+    // 先转向再移动的逻辑
     if (has_target_yaw_ && rotating_first_) {
       double yaw_error = normalizeAngle(target_yaw_ - latest_yaw_);
       
@@ -154,14 +153,14 @@ private:
                          distance, cmd.linear.x, cmd.linear.y, cmd.angular.z);
   }
 
-  // ✅ 角度归一化
+  // 角度归一化
   double normalizeAngle(double angle) {
     while (angle > M_PI) angle -= 2.0 * M_PI;
     while (angle < -M_PI) angle += 2.0 * M_PI;
     return angle;
   }
 
-  // ✅ 从 Quaternion 提取 yaw
+  // 从 Quaternion 提取 yaw
   double extractYawFromQuaternion(const geometry_msgs::msg::Quaternion& q) {
     double siny_cosp = 2.0 * (q.w * q.z + q.x * q.y);
     double cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.z * q.z);
@@ -178,7 +177,7 @@ private:
   // 状态
   bool has_goal_;
   bool has_target_yaw_;
-  bool rotating_first_;  // ✅ 标记是否在"先转向"阶段
+  bool rotating_first_;  // 标记是否在"先转向"阶段
 
   // 数据
   geometry_msgs::msg::PoseStamped latest_goal_;

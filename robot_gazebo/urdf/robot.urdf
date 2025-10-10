@@ -17,7 +17,7 @@
   <joint name="base_footprint_to_base_link" type="fixed">
     <parent link="base_footprint"/>
     <child link="base_link"/>
-    <origin rpy="0 0 0" xyz="0 0 0.05"/>
+    <origin rpy="0 0 0" xyz="0 0 0.0425"/>
   </joint>
   <!-- 底盘主体 -->
   <link name="base_link">
@@ -40,22 +40,22 @@
     </collision>
     <!-- 惯性矩阵 -->
     <inertial>
-      <mass value="0.2"/>
+      <mass value="2.0"/>
       <origin rpy="0 0 0" xyz="0 0 0"/>
-      <inertia ixx="0.0006066666666666668" ixy="0" ixz="0" iyy="0.0006066666666666668" iyz="0" izz="0.0010000000000000002"/>
+      <inertia ixx="0.006066666666666668" ixy="0" ixz="0" iyy="0.006066666666666668" iyz="0" izz="0.1"/>
     </inertial>
   </link>
   <link name="front_left_wheel">
     <visual>
       <geometry>
-        <cylinder length="0.02" radius="0.04"/>
+        <cylinder length="0.02" radius="0.0325"/>
       </geometry>
       <origin rpy="1.5707963 0 0" xyz="0 0 0"/>
       <material name="yellow"/>
     </visual>
     <collision>
       <geometry>
-        <cylinder length="0.02" radius="0.04"/>
+        <cylinder length="0.02" radius="0.0325"/>
       </geometry>
       <origin rpy="1.5707963 0 0" xyz="0 0 0"/>
       <!-- 添加摩擦力 -->
@@ -72,13 +72,13 @@
     </collision>
     <inertial>
       <mass value="0.1"/>
-      <inertia ixx="4.333333333333333e-05" ixy="0" ixz="0" iyy="4.333333333333333e-05" iyz="0" izz="8e-05"/>
+      <inertia ixx="2.9739583333333336e-05" ixy="0" ixz="0" iyy="2.9739583333333336e-05" iyz="0" izz="5.281250000000001e-05"/>
     </inertial>
   </link>
   <joint name="front_left_wheel_joint" type="continuous">
     <parent link="base_link"/>
     <child link="front_left_wheel"/>
-    <origin rpy="0 0 0" xyz="0.1 0.1 -0.010000000000000002"/>
+    <origin rpy="0 0 0" xyz="0.08 0.08 -0.0175"/>
     <axis xyz="0 1 0"/>
   </joint>
   <gazebo reference="front_left_wheel">
@@ -87,14 +87,14 @@
   <link name="front_right_wheel">
     <visual>
       <geometry>
-        <cylinder length="0.02" radius="0.04"/>
+        <cylinder length="0.02" radius="0.0325"/>
       </geometry>
       <origin rpy="1.5707963 0 0" xyz="0 0 0"/>
       <material name="yellow"/>
     </visual>
     <collision>
       <geometry>
-        <cylinder length="0.02" radius="0.04"/>
+        <cylinder length="0.02" radius="0.0325"/>
       </geometry>
       <origin rpy="1.5707963 0 0" xyz="0 0 0"/>
       <!-- 添加摩擦力 -->
@@ -111,13 +111,13 @@
     </collision>
     <inertial>
       <mass value="0.1"/>
-      <inertia ixx="4.333333333333333e-05" ixy="0" ixz="0" iyy="4.333333333333333e-05" iyz="0" izz="8e-05"/>
+      <inertia ixx="2.9739583333333336e-05" ixy="0" ixz="0" iyy="2.9739583333333336e-05" iyz="0" izz="5.281250000000001e-05"/>
     </inertial>
   </link>
   <joint name="front_right_wheel_joint" type="continuous">
     <parent link="base_link"/>
     <child link="front_right_wheel"/>
-    <origin rpy="0 0 0" xyz="0.1 -0.1 -0.010000000000000002"/>
+    <origin rpy="0 0 0" xyz="0.08 -0.08 -0.0175"/>
     <axis xyz="0 1 0"/>
   </joint>
   <gazebo reference="front_right_wheel">
@@ -126,14 +126,14 @@
   <link name="rear_left_wheel">
     <visual>
       <geometry>
-        <cylinder length="0.02" radius="0.04"/>
+        <cylinder length="0.02" radius="0.0325"/>
       </geometry>
       <origin rpy="1.5707963 0 0" xyz="0 0 0"/>
       <material name="yellow"/>
     </visual>
     <collision>
       <geometry>
-        <cylinder length="0.02" radius="0.04"/>
+        <cylinder length="0.02" radius="0.0325"/>
       </geometry>
       <origin rpy="1.5707963 0 0" xyz="0 0 0"/>
       <!-- 添加摩擦力 -->
@@ -150,13 +150,13 @@
     </collision>
     <inertial>
       <mass value="0.1"/>
-      <inertia ixx="4.333333333333333e-05" ixy="0" ixz="0" iyy="4.333333333333333e-05" iyz="0" izz="8e-05"/>
+      <inertia ixx="2.9739583333333336e-05" ixy="0" ixz="0" iyy="2.9739583333333336e-05" iyz="0" izz="5.281250000000001e-05"/>
     </inertial>
   </link>
   <joint name="rear_left_wheel_joint" type="continuous">
     <parent link="base_link"/>
     <child link="rear_left_wheel"/>
-    <origin rpy="0 0 0" xyz="-0.1 0.1 -0.010000000000000002"/>
+    <origin rpy="0 0 0" xyz="-0.08 0.08 -0.0175"/>
     <axis xyz="0 1 0"/>
   </joint>
   <gazebo reference="rear_left_wheel">
@@ -165,14 +165,14 @@
   <link name="rear_right_wheel">
     <visual>
       <geometry>
-        <cylinder length="0.02" radius="0.04"/>
+        <cylinder length="0.02" radius="0.0325"/>
       </geometry>
       <origin rpy="1.5707963 0 0" xyz="0 0 0"/>
       <material name="yellow"/>
     </visual>
     <collision>
       <geometry>
-        <cylinder length="0.02" radius="0.04"/>
+        <cylinder length="0.02" radius="0.0325"/>
       </geometry>
       <origin rpy="1.5707963 0 0" xyz="0 0 0"/>
       <!-- 添加摩擦力 -->
@@ -189,13 +189,13 @@
     </collision>
     <inertial>
       <mass value="0.1"/>
-      <inertia ixx="4.333333333333333e-05" ixy="0" ixz="0" iyy="4.333333333333333e-05" iyz="0" izz="8e-05"/>
+      <inertia ixx="2.9739583333333336e-05" ixy="0" ixz="0" iyy="2.9739583333333336e-05" iyz="0" izz="5.281250000000001e-05"/>
     </inertial>
   </link>
   <joint name="rear_right_wheel_joint" type="continuous">
     <parent link="base_link"/>
     <child link="rear_right_wheel"/>
-    <origin rpy="0 0 0" xyz="-0.1 -0.1 -0.010000000000000002"/>
+    <origin rpy="0 0 0" xyz="-0.08 -0.08 -0.0175"/>
     <axis xyz="0 1 0"/>
   </joint>
   <gazebo reference="rear_right_wheel">
@@ -305,7 +305,7 @@
       <odometryTopic>odom</odometryTopic>
       <odometryFrame>odom</odometryFrame>
       <odometryRate>50.0</odometryRate>
-      <robotBaseFrame>base_link</robotBaseFrame>
+      <robotBaseFrame>base_footprint</robotBaseFrame>
       <update_rate>50</update_rate>
     </plugin>
   </gazebo>

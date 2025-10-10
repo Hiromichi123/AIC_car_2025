@@ -48,7 +48,7 @@
           ixz="0"
           iyy="${(base_link_m * (3 * base_link_radius * base_link_radius + base_link_length * base_link_length)) / 12.0}" 
           iyz="0" 
-          izz="${(base_link_m * base_link_radius * base_link_radius) / 2.0}"/>
+          izz="0.1"/>
       </inertial>
     </link>
 
