@@ -3,10 +3,10 @@
     <xacro:property name="PI" value="3.1415926"/>
     <xacro:property name="base_link_length" value="0.08"/>
     <xacro:property name="base_link_radius" value="0.1"/>
-    <xacro:property name="wheel_radius" value="0.04"/>
+    <xacro:property name="wheel_radius" value="0.0325"/>
     <xacro:property name="wheel_length" value="0.02"/>
-    <xacro:property name="wheel_x_offset" value="0.1"/>
-    <xacro:property name="wheel_y_offset" value="0.1"/>
+    <xacro:property name="wheel_x_offset" value="0.08"/>
+    <xacro:property name="wheel_y_offset" value="0.08"/>
     <xacro:property name="earth_space" value="0.010"/>
     <xacro:property name="base_link_m" value="0.2"/>
     <xacro:property name="wheel_m" value="0.1"/>

@@ -11,8 +11,17 @@
   <material name="yellow">
     <color rgba="1.0 1.0 0.0 1.0"/>
   </material>
+  <!-- 虚拟的 root link（无质量，无惯性） -->
+  <link name="base_footprint"/>
+  <!-- 原 base_link 是 base_footprint 的子链接 -->
+  <joint name="base_footprint_to_base_link" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin rpy="0 0 0" xyz="0 0 0.05"/>
+  </joint>
   <!-- 底盘主体 -->
   <link name="base_link">
+    <!-- 可视化 -->
     <visual>
       <geometry>
         <cylinder length="0.08" radius="0.1"/>
@@ -22,6 +31,19 @@
         <color rgba="0.5 0.3 0.0 0.5"/>
       </material>
     </visual>
+    <!-- 碰撞体 -->
+    <collision>
+      <geometry>
+        <cylinder length="0.08" radius="0.1"/>
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+    </collision>
+    <!-- 惯性矩阵 -->
+    <inertial>
+      <mass value="0.2"/>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <inertia ixx="0.0006066666666666668" ixy="0" ixz="0" iyy="0.0006066666666666668" iyz="0" izz="0.0010000000000000002"/>
+    </inertial>
   </link>
   <link name="front_left_wheel">
     <visual>
