@@ -1,4 +1,5 @@
 use rclrs::{log_info, CreateBasicExecutor, SpinOptions};
+use std::time::Duration;
 
 use crate::navi::{CoordUnit, Pos};
 
@@ -14,22 +15,49 @@ async fn main() -> anyhow::Result<()> {
 
     let waypoints = vec![
         Pos {
-            translation: CoordUnit(2.8, 0.0, 0.0),
+            translation: CoordUnit(3.3, 0.0, 0.0),
             rotation: CoordUnit(0.0, 0.0, 0.0),
         },
         Pos {
-            translation: CoordUnit(3.2, 0.5, 0.0),
+            translation: CoordUnit(3.3, 0.0, 0.0),
             rotation: CoordUnit(0.0, 0.0, 1.57),
         },
         Pos {
-            translation: CoordUnit(3.2, 3.2, 0.0),
+            translation: CoordUnit(3.3, 3.3, 0.0),
             rotation: CoordUnit(0.0, 0.0, 1.57),
+        },
+        Pos {
+            translation: CoordUnit(3.3, 3.3, 0.0),
+            rotation: CoordUnit(0.0, 0.0, 3.14),
+        },
+        Pos {
+            translation: CoordUnit(0.5, 3.3, 0.0),
+            rotation: CoordUnit(0.0, 0.0, 3.14),
+        },
+        Pos {
+            translation: CoordUnit(0.5, 3.3, 0.0),
+            rotation: CoordUnit(0.0, 0.0, 4.71),
+        },
+        Pos {
+            translation: CoordUnit(0.5, 0.0, 0.0),
+            rotation: CoordUnit(0.0, 0.0, 4.71),
         },
     ];
 
     navi_node.set_destinations(waypoints, 0.2)?;
+    loop {
+        let mut spin_options = SpinOptions::default();
+        spin_options.timeout = Some(Duration::from_millis(100));
+        spin_options.only_next_available_work = true;
+        spin_options.until_promise_resolved = None;
+        executor.spin(spin_options);
 
-    executor.spin(SpinOptions::default());
+        if navi_node.is_arrived() {
+            log_info!("navi_main", "All waypoints reached! Stopping navigation...");
+            break;
+        }
+    }
 
+    log_info!("navi_main", "Navigation completed, exiting cleanly");
     Ok(())
 }

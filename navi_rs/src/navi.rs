@@ -47,6 +47,25 @@ impl CoordUnit {
         let dz = self.2 - other.2;
         (dx * dx + dy * dy + dz * dz).sqrt()
     }
+
+    /// 计算角度距离，考虑2π周期性
+    fn cal_angular_distance(&self, other: &CoordUnit) -> f64 {
+        let normalize_angle = |angle: f64| {
+            let mut a = angle % (2.0 * std::f64::consts::PI);
+            if a > std::f64::consts::PI {
+                a -= 2.0 * std::f64::consts::PI;
+            } else if a < -std::f64::consts::PI {
+                a += 2.0 * std::f64::consts::PI;
+            }
+            a
+        };
+
+        let d_roll = normalize_angle(self.0 - other.0).abs();
+        let d_pitch = normalize_angle(self.1 - other.1).abs();
+        let d_yaw = normalize_angle(self.2 - other.2).abs();
+
+        (d_roll * d_roll + d_pitch * d_pitch + d_yaw * d_yaw).sqrt()
+    }
 }
 
 impl Navi {
@@ -95,10 +114,13 @@ impl Navi {
             }
         };
 
-        let distance = dest_pos
+        let translation_distance = dest_pos
             .translation
-            .cal_distance(&self.current_pos.translation)
-            + dest_pos.rotation.cal_distance(&self.current_pos.rotation);
+            .cal_distance(&self.current_pos.translation);
+        let rotation_distance = dest_pos
+            .rotation
+            .cal_angular_distance(&self.current_pos.rotation);
+        let distance = translation_distance + rotation_distance;
 
         if distance <= self.arrive_threshold {
             self.current_waypoint_index += 1;
@@ -125,10 +147,12 @@ impl Navi {
         } else {
             log_info!(
                 "pos update",
-                "waypoint {}/{}, distance: {:.2}m",
+                "waypoint {}/{}, distance: {:.2}m (trans: {:.2}, rot: {:.2})",
                 self.current_waypoint_index + 1,
                 self.dest_pos.len(),
-                distance
+                distance,
+                translation_distance,
+                rotation_distance
             );
             return Some(false);
         }
