@@ -13,11 +13,23 @@
     </include>
     <include>
       <uri>model://aic_plane</uri>
-      <pose>1.65 1.65 0.0 0 0 3.1415</pose>
+      <pose>1.65 1.65 0 0 0 3.1415</pose>
     </include>
 
+    <!-- 人物墙 -->
+    <include>
+      <uri>model://aic_ro1</uri>
+      <pose>2.5 1.65 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>model://aic_ro2</uri>
+      <pose>2.5 0.7 0 0 0 3.1415</pose>
+    </include>
+
+    <!-- 车牌墙 -->
     <include>
       <uri>model://aic_cp</uri>
+      <pose>0.1 2.7 0 0 0 1.57</pose>
     </include>
 
     <!-- 物理引擎参数 -->
@@ -149,85 +161,6 @@
             <ambient>0.0 0.0 0.0 1</ambient>
           </material>
           <pose>3.65 1.65 0 0 0 0</pose>
-        </visual>
-      </link>
-    </model>
-
-    <!-- 人物墙 -->
-    <!-- 长度 1m，墙厚度 0.05m，高度 1m -->
-    <model name="person_wall1">
-      <static>true</static>
-      <link name="link">
-        <collision name="collision">
-          <geometry>
-            <box>
-              <size>0.8 0.05 1</size>
-            </box>
-          </geometry>
-          <pose>2.5 1.6 0 0 0 0</pose>
-        </collision>
-        <visual name="visual">
-          <geometry>
-            <box>
-              <size>0.8 0.05 1</size>
-            </box>
-          </geometry>
-          <material>
-            <ambient>0.0 0.0 0.0 1</ambient>
-          </material>
-          <pose>2.5 1.6 0 0 0 0</pose>
-        </visual>
-      </link>
-    </model>
-
-    <model name="person_wall2">
-      <static>true</static>
-      <link name="link">
-        <collision name="collision">
-          <geometry>
-            <box>
-              <size>0.8 0.05 1</size>
-            </box>
-          </geometry>
-          <pose>2.5 0.7 0 0 0</pose>
-        </collision>
-        <visual name="visual">
-          <geometry>
-            <box>
-              <size>0.8 0.05 1</size>
-            </box>
-          </geometry>
-          <material>
-            <ambient>0.0 0.0 0.0 1</ambient>
-          </material>
-          <pose>2.5 0.7 0 0 0</pose>
-        </visual>
-      </link>
-    </model>
-
-    <!-- 车牌墙 -->
-    <!-- 长度 0.5m，墙厚度 0.05m，高度 0.5m -->
-    <model name="plate_wall">
-      <static>true</static>
-      <link name="link">
-        <collision name="collision">
-          <geometry>
-            <box>
-              <size>0.1 0.5 1</size>
-            </box>
-          </geometry>
-          <pose>0.1 2.68 0 0 0 0</pose>
-        </collision>
-        <visual name="visual">
-          <geometry>
-            <box>
-              <size>0.1 0.5 1</size>
-            </box>
-          </geometry>
-          <material>
-            <ambient>0.0 0.0 0.0 1</ambient>
-          </material>
-          <pose>0.1 2.68 0 0 0 0</pose>
         </visual>
       </link>
     </model>

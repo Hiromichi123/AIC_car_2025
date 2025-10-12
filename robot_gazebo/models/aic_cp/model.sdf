@@ -6,7 +6,7 @@
       <visual name="visual">
         <geometry>
           <mesh>
-            <uri>model://cp/meshes/cp.dae</uri>
+            <uri>model://aic_cp/meshes/cp.dae</uri>
           </mesh>
         </geometry>
       </visual>
