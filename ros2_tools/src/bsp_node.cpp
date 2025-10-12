@@ -1,31 +1,30 @@
-#include <rclcpp/rclcpp.hpp>
-#include <geometry_msgs/msg/pose_stamped.hpp>
-#include <geometry_msgs/msg/twist.hpp>
 #include "ros2_tools/msg/lidar_pose.hpp"
 #include <cmath>
+#include <geometry_msgs/msg/pose_stamped.hpp>
+#include <geometry_msgs/msg/twist.hpp>
+#include <rclcpp/rclcpp.hpp>
 
 class PositionController : public rclcpp::Node {
 public:
-  PositionController() : Node("bsp_node"), 
-                         Kp_linear_(0.8), 
-                         Kp_angular_(2.0),
-                         has_goal_(false),
-                         has_target_yaw_(false),
-                         rotating_first_(false),
-                         position_threshold_(0.03),      // 3cm 认为到达
-                         angle_threshold_(0.05),         // ~3° 认为朝向正确
-                         rotation_first_threshold_(0.2)  // 角度误差 > 11° 时先转向
+  PositionController()
+      : Node("bsp_node"), Kp_linear_(0.9), Kp_angular_(2.0), has_goal_(false),
+        has_target_yaw_(false), rotating_first_(false),
+        position_threshold_(0.03),     // 3cm 认为到达
+        angle_threshold_(0.05),        // ~3° 认为朝向正确
+        rotation_first_threshold_(0.2) // 角度误差 > 11° 时先转向
   {
     goal_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
-      "/goal", 10,
-      std::bind(&PositionController::goalCallback, this, std::placeholders::_1));
+        "/goal", 10,
+        std::bind(&PositionController::goalCallback, this,
+                  std::placeholders::_1));
 
     lidar_sub_ = this->create_subscription<ros2_tools::msg::LidarPose>(
-      "/lidar_data", 10,
-      std::bind(&PositionController::lidarCallback, this, std::placeholders::_1));
+        "/lidar_data", 10,
+        std::bind(&PositionController::lidarCallback, this,
+                  std::placeholders::_1));
 
-    cmd_pub_ = this->create_publisher<geometry_msgs::msg::Twist>(
-      "/cmd_vel", 10);
+    cmd_pub_ =
+        this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
 
     RCLCPP_INFO(this->get_logger(), "bsp_node started (planar move mode).");
   }
@@ -34,28 +33,28 @@ private:
   void goalCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
     latest_goal_ = *msg;
     has_goal_ = true;
-    
+
     // 检查是否有目标朝向
-    auto& q = msg->pose.orientation;
-    if (fabs(q.x) > 0.001 || fabs(q.y) > 0.001 || 
-        fabs(q.z) > 0.001 || fabs(q.w - 1.0) > 0.001) {
+    auto &q = msg->pose.orientation;
+    if (fabs(q.x) > 0.001 || fabs(q.y) > 0.001 || fabs(q.z) > 0.001 ||
+        fabs(q.w - 1.0) > 0.001) {
       // 有目标朝向
       target_yaw_ = extractYawFromQuaternion(q);
       has_target_yaw_ = true;
       rotating_first_ = true;
-      RCLCPP_INFO(this->get_logger(), 
-                  "Goal with orientation: pos(%.2f, %.2f), yaw=%.1f°", 
-                  msg->pose.position.x, msg->pose.position.y, 
+      RCLCPP_INFO(this->get_logger(),
+                  "Goal with orientation: pos(%.2f, %.2f), yaw=%.1f°",
+                  msg->pose.position.x, msg->pose.position.y,
                   target_yaw_ * 180.0 / M_PI);
     } else {
       // 无目标朝向
       has_target_yaw_ = false;
       rotating_first_ = false;
-      RCLCPP_INFO(this->get_logger(), 
-                  "Goal without orientation: pos(%.2f, %.2f)", 
+      RCLCPP_INFO(this->get_logger(),
+                  "Goal without orientation: pos(%.2f, %.2f)",
                   msg->pose.position.x, msg->pose.position.y);
     }
-    
+
     computeAndPublish();
   }
 
@@ -64,17 +63,19 @@ private:
     latest_pose_.pose.position.y = msg->y;
     latest_pose_.pose.position.z = msg->z;
     latest_yaw_ = msg->yaw;
-    
+
     if (has_goal_) {
       computeAndPublish();
     }
   }
 
   void computeAndPublish() {
-    double dx_global = latest_goal_.pose.position.x - latest_pose_.pose.position.x;
-    double dy_global = latest_goal_.pose.position.y - latest_pose_.pose.position.y;
+    double dx_global =
+        latest_goal_.pose.position.x - latest_pose_.pose.position.x;
+    double dy_global =
+        latest_goal_.pose.position.y - latest_pose_.pose.position.y;
     double distance = sqrt(dx_global * dx_global + dy_global * dy_global);
-    
+
     geometry_msgs::msg::Twist cmd;
 
     // 检查是否到达位置
@@ -82,18 +83,18 @@ private:
       // 位置已到达
       if (has_target_yaw_) {
         double yaw_error = normalizeAngle(target_yaw_ - latest_yaw_);
-        
+
         if (fabs(yaw_error) > angle_threshold_) {
           // 需要调整角度
           cmd.angular.z = Kp_angular_ * yaw_error;
           cmd_pub_->publish(cmd);
           RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 500,
-                               "Position reached, adjusting angle: %.1f° to go", 
+                               "Position reached, adjusting angle: %.1f° to go",
                                yaw_error * 180.0 / M_PI);
           return;
         }
       }
-      
+
       // 完全到达
       cmd_pub_->publish(cmd);
       has_goal_ = false;
@@ -104,13 +105,13 @@ private:
     // 先转向再移动的逻辑
     if (has_target_yaw_ && rotating_first_) {
       double yaw_error = normalizeAngle(target_yaw_ - latest_yaw_);
-      
+
       if (fabs(yaw_error) > rotation_first_threshold_) {
         // 角度误差大，先原地转向
         cmd.angular.z = Kp_angular_ * yaw_error;
         cmd_pub_->publish(cmd);
         RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 500,
-                             "Rotating first: %.1f° to go", 
+                             "Rotating first: %.1f° to go",
                              yaw_error * 180.0 / M_PI);
         return;
       } else {
@@ -128,10 +129,11 @@ private:
 
     cmd.linear.x = Kp_linear_ * dx_local;
     cmd.linear.y = Kp_linear_ * dy_local;
-    
+
     // 速度限幅（保持方向）
     double v_max = 0.5;
-    double v_magnitude = sqrt(cmd.linear.x * cmd.linear.x + cmd.linear.y * cmd.linear.y);
+    double v_magnitude =
+        sqrt(cmd.linear.x * cmd.linear.x + cmd.linear.y * cmd.linear.y);
     if (v_magnitude > v_max) {
       double scale = v_max / v_magnitude;
       cmd.linear.x *= scale;
@@ -141,27 +143,29 @@ private:
     // 移动时微调角度（如果有目标朝向）
     if (has_target_yaw_ && !rotating_first_) {
       double yaw_error = normalizeAngle(target_yaw_ - latest_yaw_);
-      cmd.angular.z = Kp_angular_ * yaw_error * 0.3;  // 降低权重
+      cmd.angular.z = Kp_angular_ * yaw_error * 0.3; // 降低权重
     } else {
       cmd.angular.z = 0.0;
     }
 
     cmd_pub_->publish(cmd);
-    
+
     RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
-                         "Distance: %.2fm, vx=%.2f, vy=%.2f, ω=%.2f", 
-                         distance, cmd.linear.x, cmd.linear.y, cmd.angular.z);
+                         "Distance: %.2fm, vx=%.2f, vy=%.2f, ω=%.2f", distance,
+                         cmd.linear.x, cmd.linear.y, cmd.angular.z);
   }
 
   // 角度归一化
   double normalizeAngle(double angle) {
-    while (angle > M_PI) angle -= 2.0 * M_PI;
-    while (angle < -M_PI) angle += 2.0 * M_PI;
+    while (angle > M_PI)
+      angle -= 2.0 * M_PI;
+    while (angle < -M_PI)
+      angle += 2.0 * M_PI;
     return angle;
   }
 
   // 从 Quaternion 提取 yaw
-  double extractYawFromQuaternion(const geometry_msgs::msg::Quaternion& q) {
+  double extractYawFromQuaternion(const geometry_msgs::msg::Quaternion &q) {
     double siny_cosp = 2.0 * (q.w * q.z + q.x * q.y);
     double cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.z * q.z);
     return atan2(siny_cosp, cosy_cosp);
@@ -177,7 +181,7 @@ private:
   // 状态
   bool has_goal_;
   bool has_target_yaw_;
-  bool rotating_first_;  // 标记是否在"先转向"阶段
+  bool rotating_first_; // 标记是否在"先转向"阶段
 
   // 数据
   geometry_msgs::msg::PoseStamped latest_goal_;
@@ -190,8 +194,7 @@ private:
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_pub_;
 };
 
-int main(int argc, char ** argv)
-{
+int main(int argc, char **argv) {
   rclcpp::init(argc, argv);
   rclcpp::spin(std::make_shared<PositionController>());
   rclcpp::shutdown();
