@@ -16,6 +16,10 @@
       <pose>1.65 1.65 0.0 0 0 3.1415</pose>
     </include>
 
+    <include>
+      <uri>model://aic_cp</uri>
+    </include>
+
     <!-- 物理引擎参数 -->
     <physics name='default_physics' default='0' type='ode'>
       <gravity>0 0 -9.8066</gravity>
@@ -38,5 +42,194 @@
       <real_time_update_rate>250</real_time_update_rate>
       <magnetic_field>6.0e-6 2.3e-5 -4.2e-5</magnetic_field>
     </physics>
+
+    <!-- 黑色材质 -->
+    <material name="Black">
+      <ambient>0.0 0.0 0.0 1</ambient>
+      <diffuse>0.0 0.0 0.0 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+      <emissive>0 0 0 1</emissive>
+    </material>
+
+    <!-- 围墙 -->
+    <!-- 长度 4m，墙厚度 0.1m，高度 1.0m -->
+    <model name="wall1">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>4 0.1 1.0</size>
+            </box>
+          </geometry>
+          <pose>1.65 -0.35 0 0 0 0</pose>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>4 0.1 1.0</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.0 0.0 0.0 1</ambient>
+          </material>
+          <pose>1.65 -0.35 0 0 0 0</pose>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall2">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>4 0.1 1.0</size>
+            </box>
+          </geometry>
+          <pose>1.65 3.65 0 0 0</pose>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>4 0.1 1.0</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.0 0.0 0.0 1</ambient>
+          </material>
+          <pose>1.65 3.65 0 0 0</pose>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall3">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.1 4 1.0</size>
+            </box>
+          </geometry>
+          <pose>-0.35 1.65 0 0 0 0</pose>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.1 4 1.0</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.0 0.0 0.0 1</ambient>
+          </material>
+          <pose>-0.35 1.65 0 0 0 0</pose>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall4">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.1 4 1.0</size>
+            </box>
+          </geometry>
+          <pose>3.65 1.65 0 0 0 0</pose>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.1 4 1.0</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.0 0.0 0.0 1</ambient>
+          </material>
+          <pose>3.65 1.65 0 0 0 0</pose>
+        </visual>
+      </link>
+    </model>
+
+    <!-- 人物墙 -->
+    <!-- 长度 1m，墙厚度 0.05m，高度 1m -->
+    <model name="person_wall1">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.8 0.05 1</size>
+            </box>
+          </geometry>
+          <pose>2.5 1.6 0 0 0 0</pose>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.8 0.05 1</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.0 0.0 0.0 1</ambient>
+          </material>
+          <pose>2.5 1.6 0 0 0 0</pose>
+        </visual>
+      </link>
+    </model>
+
+    <model name="person_wall2">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.8 0.05 1</size>
+            </box>
+          </geometry>
+          <pose>2.5 0.7 0 0 0</pose>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.8 0.05 1</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.0 0.0 0.0 1</ambient>
+          </material>
+          <pose>2.5 0.7 0 0 0</pose>
+        </visual>
+      </link>
+    </model>
+
+    <!-- 车牌墙 -->
+    <!-- 长度 0.5m，墙厚度 0.05m，高度 0.5m -->
+    <model name="plate_wall">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.1 0.5 1</size>
+            </box>
+          </geometry>
+          <pose>0.1 2.68 0 0 0 0</pose>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.1 0.5 1</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.0 0.0 0.0 1</ambient>
+          </material>
+          <pose>0.1 2.68 0 0 0 0</pose>
+        </visual>
+      </link>
+    </model>
   </world>
 </sdf>
