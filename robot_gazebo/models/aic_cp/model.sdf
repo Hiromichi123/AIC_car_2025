@@ -7,9 +7,19 @@
         <geometry>
           <mesh>
             <uri>model://aic_cp/meshes/cp.dae</uri>
+            <scale>0.7 0.7 0.7</scale>
           </mesh>
         </geometry>
       </visual>
+
+      <collision name="collision">
+        <geometry>
+          <mesh>
+            <uri>model://aic_cp/meshes/cp.dae</uri>
+            <scale>0.7 0.7 0.7</scale>
+          </mesh>
+        </geometry>
+      </collision>
     </link>
   </model>
 </sdf>

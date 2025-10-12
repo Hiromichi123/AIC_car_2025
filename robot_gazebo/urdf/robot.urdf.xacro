@@ -39,37 +39,4 @@
         <update_rate>50</update_rate>
       </plugin>
     </gazebo>
-
-    <!-- 雷达传感器仿真插件 -->
-  <gazebo reference="laser">
-      <sensor type="ray" name="rplidar">
-          <pose>0 0 0 0 0 0</pose>
-          <visualize>false</visualize> <!-- Gazebo中显示雷达探测线 -->
-          <update_rate>10</update_rate>
-          <ray>
-              <scan>
-                  <horizontal>
-                      <samples>360</samples>
-                      <resolution>1</resolution>
-                      <min_angle>-3.14159</min_angle>
-                      <max_angle>3.14159</max_angle>
-                  </horizontal>
-              </scan>
-              <range>
-                  <min>0.15</min>
-                  <max>12.0</max>
-                  <resolution>0.01</resolution>
-              </range>
-              <noise>
-                  <type>gaussian</type>
-                  <mean>0.0</mean>
-                  <stddev>0.01</stddev>
-              </noise>
-          </ray>
-          <plugin name="gazebo_ros_rplidar_controller" filename="libgazebo_ros_laser.so">
-              <topicName>/scan</topicName>
-              <frameName>laser</frameName>
-          </plugin>
-      </sensor>
-  </gazebo>
 </robot>

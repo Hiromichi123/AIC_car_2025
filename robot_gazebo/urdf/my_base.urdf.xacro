@@ -71,8 +71,8 @@
           <surface>
             <friction>
               <ode>
-                <mu>0.2</mu>      <!-- 主摩擦系数 -->
-                <mu2>0.2</mu2>    <!-- 次摩擦系数 -->
+                <mu>1.0</mu>      <!-- 主摩擦系数 -->
+                <mu2>1.0</mu2>    <!-- 次摩擦系数 -->
               </ode>
             </friction>
           </surface>

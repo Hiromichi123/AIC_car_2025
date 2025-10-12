@@ -1,39 +1,103 @@
-<!-- 摄像头相关的 xacro 文件 -->
+<!-- 摄像头 -->
 <robot name="my_camera" xmlns:xacro="http://wiki.ros.org/xacro">
     <!-- 属性 -->
     <xacro:property name="camera_length" value="0.01" /> <!-- 摄像头长度(x) -->
     <xacro:property name="camera_width" value="0.025" /> <!-- 摄像头宽度(y) -->
     <xacro:property name="camera_height" value="0.025" /> <!-- 摄像头高度(z) -->
-    <xacro:property name="camera_x" value="0.08" /> <!-- 摄像头安装的x坐标 -->
-    <xacro:property name="camera_y" value="0.0" /> <!-- 摄像头安装的y坐标 -->
-    <xacro:property name="camera_z" value="${base_link_length / 2 + camera_height / 2}" /> <!-- 摄像头安装的z坐标:底盘高度 / 2 + 摄像头高度 / 2  -->
-
     <xacro:property name="camera_m" value="0.01" /> <!-- 摄像头质量 -->
 
-    <!-- 摄像头关节以及link -->
-    <link name="camera">
-        <visual>
-            <geometry>
-                <box size="${camera_length} ${camera_width} ${camera_height}" />
-            </geometry>
-            <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0" />
-            <material name="black" />
-        </visual>
-        <collision>
-            <geometry>
-                <box size="${camera_length} ${camera_width} ${camera_height}" />
-            </geometry>
-            <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0" />
-        </collision>
-        <xacro:Box_inertial_matrix m="${camera_m}" l="${camera_length}" w="${camera_width}" h="${camera_height}" />
-    </link>
+    <!-- 安装位置 -->
+    <xacro:property name="camera_x" value="0.0" />  <!-- 与车体中心对齐 -->
+    <xacro:property name="camera_y_offset" value="0.08" />  <!-- 两侧偏移距离 -->
+    <xacro:property name="camera_z" value="${base_link_length / 2 + camera_height / 2}" />
 
-    <joint name="camera2base_link" type="fixed">
-        <parent link="base_link" />
-        <child link="camera" />
-        <origin xyz="${camera_x} ${camera_y} ${camera_z}" />
-    </joint>
-    <gazebo reference="camera">
-        <material>Gazebo/Blue</material>
-    </gazebo>
+
+    <!-- 摄像头宏定义 - 可重复使用 -->
+    <xacro:macro name="camera_module" params="name parent_link x y z yaw">
+        <!-- 摄像头 Link -->
+        <link name="${name}">
+            <visual>
+                <geometry>
+                    <box size="${camera_length} ${camera_width} ${camera_height}" />
+                </geometry>
+                <origin xyz="0 0 0" rpy="0 0 0" />
+                <material name="camera_blue">
+                    <color rgba="0.2 0.5 0.8 1.0" />
+                </material>
+            </visual>
+            <collision>
+                <geometry>
+                    <box size="${camera_length} ${camera_width} ${camera_height}" />
+                </geometry>
+                <origin xyz="0 0 0" rpy="0 0 0" />
+            </collision>
+            <xacro:Box_inertial_matrix m="${camera_m}" l="${camera_length}" w="${camera_width}" h="${camera_height}" />
+        </link>
+
+        <!-- 摄像头 Joint -->
+        <joint name="${name}_joint" type="fixed">
+            <parent link="${parent_link}" />
+            <child link="${name}" />
+            <origin xyz="${x} ${y} ${z}" rpy="0 0 ${yaw}" />
+        </joint>
+
+        <!-- Gazebo 材质 -->
+        <gazebo reference="${name}">
+            <material>Gazebo/Blue</material>
+        </gazebo>
+
+        <!-- Gazebo 摄像头传感器插件 -->
+        <gazebo reference="${name}">
+            <sensor type="camera" name="${name}_sensor">
+                <update_rate>30.0</update_rate>
+                <visualize>true</visualize>  <!-- 在 Gazebo 中显示摄像头视锥 -->
+                <camera name="${name}">
+                    <horizontal_fov>1.6</horizontal_fov>  <!-- 90度视角 = 1.6 弧度 -->
+                    <image>
+                        <width>1280</width>  <!-- 720p 宽度 -->
+                        <height>720</height>  <!-- 720p 高度 -->
+                        <format>R8G8B8</format>
+                    </image>
+                    <clip>
+                        <near>0.02</near>
+                        <far>10.0</far>
+                    </clip>
+                    <noise>
+                        <type>gaussian</type>
+                        <mean>0.0</mean>
+                        <stddev>0.007</stddev>
+                    </noise>
+                </camera>
+                <plugin name="${name}_controller" filename="libgazebo_ros_camera.so">
+                    <ros>
+                        <namespace></namespace>
+                        <remapping>image_raw:=${name}/image_raw</remapping>
+                        <remapping>camera_info:=${name}/camera_info</remapping>
+                    </ros>
+                    <camera_name>${name}</camera_name>
+                    <frame_name>${name}</frame_name>
+                    <hack_baseline>0.07</hack_baseline>
+                </plugin>
+            </sensor>
+        </gazebo>
+    </xacro:macro>
+
+    <!-- 左侧摄像头 - 朝左 (yaw = 1.5708 = 90度) -->
+    <xacro:camera_module 
+        name="camera1" 
+        parent_link="base_link" 
+        x="${camera_x}" 
+        y="${camera_y_offset}" 
+        z="${camera_z}" 
+        yaw="1.5708" />
+
+    <!-- 右侧摄像头 - 朝右 (yaw = -1.5708 = -90度) -->
+    <xacro:camera_module 
+        name="camera2" 
+        parent_link="base_link" 
+        x="${camera_x}" 
+        y="${-camera_y_offset}" 
+        z="${camera_z}" 
+        yaw="-1.5708" />
+
 </robot>
