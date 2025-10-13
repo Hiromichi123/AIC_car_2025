@@ -22,12 +22,12 @@ fn main() -> anyhow::Result<()> {
             rotation: CoordUnit(0.0, 0.0, 0.0),
         },
         Pos {
-            translation: CoordUnit(2.6, 1.3, 0.0),
+            translation: CoordUnit(2.5, 1.3, 0.0),
             rotation: CoordUnit(0.0, 0.0, 0.0),
         },
     ];
 
-    navi_node.set_destinations(waypoints, 0.2)?;
+    navi_node.set_destinations(waypoints, 0.25)?;
     loop {
         let mut spin_options = SpinOptions::default();
         spin_options.timeout = Some(Duration::from_millis(100));
@@ -36,13 +36,13 @@ fn main() -> anyhow::Result<()> {
         executor.spin(spin_options);
 
         if navi_node.is_arrived() {
-            log_info!("navi_main", "All waypoints reached! Stopping navigation...");
+            log_info!("navi_main", "First Camera reached! Stopping navigation...");
             break;
         }
     }
 
-    log_info!("navi_main", "Sleeping for 2 secs.");
-    sleep(std::time::Duration::from_secs_f32(2.0));
+    log_info!("navi_main", "Sleeping for 5 secs.");
+    sleep(std::time::Duration::from_secs_f32(5.0));
 
     let waypoints = vec![
         Pos {
@@ -54,16 +54,12 @@ fn main() -> anyhow::Result<()> {
             rotation: CoordUnit(0.0, 0.0, 0.0),
         },
         Pos {
-            translation: CoordUnit(0.6, 3.3, 0.0),
-            rotation: CoordUnit(0.0, 0.0, 0.0),
-        },
-        Pos {
-            translation: CoordUnit(0.6, 3.3, 0.0),
+            translation: CoordUnit(0.6, 3.1, 0.0),
             rotation: CoordUnit(0.0, 0.0, 1.6),
         },
     ];
 
-    navi_node.set_destinations(waypoints, 0.2)?;
+    navi_node.set_destinations(waypoints, 0.25)?;
     loop {
         let mut spin_options = SpinOptions::default();
         spin_options.timeout = Some(Duration::from_millis(100));
@@ -77,12 +73,34 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
-    log_info!("navi_main", "Sleeping for 2 secs.");
-    sleep(std::time::Duration::from_secs_f32(2.0));
+    log_info!("navi_main", "Sleeping for 4 secs.");
+    sleep(std::time::Duration::from_secs_f32(4.0));
+
+    let waypoints = vec![Pos {
+        translation: CoordUnit(0.6, 2.8, 0.0),
+        rotation: CoordUnit(0.0, 0.0, 1.6),
+    }];
+
+    navi_node.set_destinations(waypoints, 0.25)?;
+    loop {
+        let mut spin_options = SpinOptions::default();
+        spin_options.timeout = Some(Duration::from_millis(100));
+        spin_options.only_next_available_work = true;
+        spin_options.until_promise_resolved = None;
+        executor.spin(spin_options);
+
+        if navi_node.is_arrived() {
+            log_info!("navi_main", "All waypoints reached! Stopping navigation...");
+            break;
+        }
+    }
+
+    log_info!("navi_main", "Sleeping for 4 secs.");
+    sleep(std::time::Duration::from_secs_f32(4.0));
 
     let waypoints = vec![
         Pos {
-            translation: CoordUnit(0.6, 3.3, 0.0),
+            translation: CoordUnit(0.6, 2.8, 0.0),
             rotation: CoordUnit(0.0, 0.0, 6.28),
         },
         Pos {
@@ -95,7 +113,7 @@ fn main() -> anyhow::Result<()> {
         },
     ];
 
-    navi_node.set_destinations(waypoints, 0.2)?;
+    navi_node.set_destinations(waypoints, 0.25)?;
     loop {
         let mut spin_options = SpinOptions::default();
         spin_options.timeout = Some(Duration::from_millis(100));
