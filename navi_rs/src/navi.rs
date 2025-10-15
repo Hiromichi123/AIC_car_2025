@@ -1,9 +1,11 @@
 use geometry_msgs::msg::PoseStamped;
-use rclrs::{log_info, Publisher};
+use rclrs::{log_info, Client, Publisher};
 use rclrs::{SubscriptionState, WorkerState};
 use ros2_tools::msg::LidarPose;
+use ros2_tools::srv::{OCR_Request, OCR_Response, YOLO_Request, YOLO_Response, OCR, YOLO};
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct CoordUnit(pub f64, pub f64, pub f64);
@@ -28,6 +30,8 @@ pub struct NaviSubNode {
     #[allow(unused)]
     pub navi_instance: Arc<Mutex<Navi>>,
     goal_publisher: Publisher<PoseStamped>,
+    yolo_client: Arc<Client<YOLO>>,
+    ocr_client: Arc<Client<OCR>>,
     _subscription: Arc<SubscriptionState<LidarPose, Arc<WorkerState<LidarPose>>>>,
 }
 
@@ -186,6 +190,9 @@ impl NaviSubNode {
         let goal_publisher = node.create_publisher::<PoseStamped>("/goal")?;
         let goal_pub_clone = goal_publisher.clone();
 
+        let yolo_client = node.create_client::<YOLO>("yolo_trigger")?;
+        let ocr_client = node.create_client::<OCR>("ocr_trigger")?;
+
         let navi_instance = Arc::new(Mutex::new(Navi::new()));
         let navi_instance_clone = Arc::clone(&navi_instance);
 
@@ -211,8 +218,94 @@ impl NaviSubNode {
         Ok(NaviSubNode {
             navi_instance,
             goal_publisher,
+            yolo_client: Arc::new(yolo_client),
+            ocr_client: Arc::new(ocr_client),
             _subscription,
         })
+    }
+
+    /// 阻塞调用 YOLO 服务
+    pub fn call_yolo_blocking(&self, timeout: Duration) -> anyhow::Result<YOLO_Response> {
+        log_info!("navi", "Calling YOLO service (blocking)...");
+
+        let request = YOLO_Request::default();
+
+        // 发送一次请求，然后阻塞等待响应
+        let mut promise = self
+            .yolo_client
+            .call(&request)
+            .map_err(|e| anyhow::anyhow!("YOLO service call failed: {:?}", e))?;
+
+        let time_start = Instant::now();
+        let response: YOLO_Response = loop {
+            if time_start.elapsed() > timeout {
+                return Err(anyhow::anyhow!(
+                    "YOLO service call timeout after {:?}",
+                    timeout
+                ));
+            }
+
+            let maybe = promise
+                .try_recv()
+                .map_err(|e| anyhow::anyhow!("Receiving YOLO service response error: {:?}", e))?;
+            match maybe {
+                Some(r) => break r,
+                None => {
+                    std::thread::sleep(Duration::from_millis(10));
+                    continue;
+                }
+            }
+        };
+
+        log_info!(
+            "navi",
+            "YOLO response - success: {}, message: {}",
+            response.success,
+            response.message
+        );
+        return Ok(response);
+    }
+
+    /// 阻塞调用 OCR 服务
+    pub fn call_ocr_blocking(&self, timeout: Duration) -> anyhow::Result<OCR_Response> {
+        log_info!("navi", "Calling OCR service (blocking)...");
+
+        let request = OCR_Request::default();
+
+        // 使用阻塞调用：等待 Promise 完成并获取响应
+        let mut promise = self
+            .ocr_client
+            .call(&request)
+            .map_err(|e| anyhow::anyhow!("OCR service call failed: {:?}", e))?;
+
+        let time_start = Instant::now();
+        let response: OCR_Response = loop {
+            if time_start.elapsed() > timeout {
+                return Err(anyhow::anyhow!(
+                    "OCR service call timeout after {:?}",
+                    timeout
+                ));
+            }
+
+            let maybe = promise
+                .try_recv()
+                .map_err(|e| anyhow::anyhow!("Receiving OCR service response error: {:?}", e))?;
+            match maybe {
+                Some(r) => break r,
+                None => {
+                    std::thread::sleep(Duration::from_millis(10));
+                    continue;
+                }
+            }
+        };
+
+        log_info!(
+            "navi",
+            "OCR response - success: {}, message: {}",
+            response.success,
+            response.message
+        );
+        Ok(response)
     }
 
     fn publish_goal_with(publisher: &Publisher<PoseStamped>, navi: &Navi) -> anyhow::Result<()> {

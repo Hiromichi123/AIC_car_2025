@@ -10,7 +10,7 @@ fn main() -> anyhow::Result<()> {
     let mut executor = context.create_basic_executor();
 
     log_info!("navi_main", "starting navigator...");
-    let navi_node = navi::NaviSubNode::new(&executor, "navi1", "lidar_data")?;
+    let navi_node = navi::NaviSubNode::new(&executor, "navigator", "lidar_data")?;
 
     let waypoints = vec![
         Pos {
@@ -36,13 +36,22 @@ fn main() -> anyhow::Result<()> {
         executor.spin(spin_options);
 
         if navi_node.is_arrived() {
-            log_info!("navi_main", "First Camera reached! Stopping navigation...");
+            log_info!(
+                "navi_main",
+                "First Camera point reached! Stopping navigation..."
+            );
             break;
         }
     }
 
-    log_info!("navi_main", "Sleeping for 5 secs.");
-    sleep(std::time::Duration::from_secs_f32(5.0));
+    let mut spin_options = SpinOptions::default();
+    spin_options.timeout = Some(Duration::from_millis(100));
+    spin_options.only_next_available_work = true;
+    spin_options.until_promise_resolved = None;
+    executor.spin(spin_options);
+
+    let yolo_response = navi_node.call_yolo_blocking(Duration::from_secs_f32(2.0))?;
+    println!("yolo: {:?}", yolo_response.message);
 
     let waypoints = vec![
         Pos {
@@ -73,8 +82,14 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
-    log_info!("navi_main", "Sleeping for 4 secs.");
-    sleep(std::time::Duration::from_secs_f32(4.0));
+    let mut spin_options = SpinOptions::default();
+    spin_options.timeout = Some(Duration::from_millis(100));
+    spin_options.only_next_available_work = true;
+    spin_options.until_promise_resolved = None;
+    executor.spin(spin_options);
+
+    let ocr_response = navi_node.call_ocr_blocking(Duration::from_secs_f32(2.0))?;
+    println!("ocr: {:?}", ocr_response.message);
 
     let waypoints = vec![Pos {
         translation: CoordUnit(0.6, 2.8, 0.0),

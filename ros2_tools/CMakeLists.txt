@@ -21,7 +21,12 @@ find_package(OpenCV REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(realsense2 REQUIRED)
 
-rosidl_generate_interfaces(${PROJECT_NAME} "msg/LidarPose.msg")
+rosidl_generate_interfaces(${PROJECT_NAME} 
+  "msg/LidarPose.msg"
+  "srv/OCR.srv"
+  "srv/YOLO.srv"
+)
+
 ament_export_dependencies(rosidl_default_runtime)
 
 add_executable(lidar_data_node src/lidar_data_node.cpp)

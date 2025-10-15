@@ -1,0 +1,18 @@
+shapely
+scikit-image
+pyclipper
+lmdb
+tqdm
+numpy
+rapidfuzz
+opencv-python
+opencv-contrib-python
+cython
+Pillow
+pyyaml
+requests
+albumentations
+# to be compatible with albumentations
+albucore
+packaging
+paddlepaddle==2.6.2
