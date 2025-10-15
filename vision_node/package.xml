@@ -8,6 +8,8 @@
   <license>BSD-3-Clause</license>
 
   <depend>rclpy</depend>
+  <depend>sensor_msgs</depend>
+  <depend>ros2_tools</depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

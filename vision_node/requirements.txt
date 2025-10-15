@@ -16,3 +16,5 @@ albumentations
 albucore
 packaging
 paddlepaddle==2.6.2
+ultralytics
+paddleocr
