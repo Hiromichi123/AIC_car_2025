@@ -12,11 +12,13 @@ class VisionNode(Node):
 
     def yolo_callback(self, request, response):
         response.success = True
+        print("start yolo detection...")
         response.message = "yolo callback!"
         return response
 
     def ocr_callback(self, request, response):
         response.success = True
+        print("start ocr detection...")
         response.message = "ocr callback!"
         return response
 

@@ -62,9 +62,7 @@ def generate_launch_description():
     mecanum_controller_spawner = TimerAction(period=10.0, actions=[mecanum_controller_spawner]) # 延迟10秒启动
 
     return LaunchDescription([
-        xacro_urdf_process,
         robot_description,
         gazebo_process,
         spawn_entity_node,
-        #mecanum_controller_spawner
     ])

@@ -225,12 +225,17 @@ impl NaviSubNode {
     }
 
     /// 阻塞调用 YOLO 服务
-    pub fn call_yolo_blocking(&self, timeout: Duration) -> anyhow::Result<YOLO_Response> {
+    pub fn call_yolo_blocking(
+        &self,
+        executor: &mut rclrs::Executor,
+        timeout: Duration,
+    ) -> anyhow::Result<YOLO_Response> {
         log_info!("navi", "Calling YOLO service (blocking)...");
 
         let request = YOLO_Request::default();
 
         // 发送一次请求，然后阻塞等待响应
+        log_info!("navi", "calling yolo service");
         let mut promise = self
             .yolo_client
             .call(&request)
@@ -245,14 +250,20 @@ impl NaviSubNode {
                 ));
             }
 
-            let maybe = promise
-                .try_recv()
-                .map_err(|e| anyhow::anyhow!("Receiving YOLO service response error: {:?}", e))?;
-            match maybe {
-                Some(r) => break r,
-                None => {
-                    std::thread::sleep(Duration::from_millis(10));
+            // 需要 spin executor 来处理服务响应
+            let mut spin_options = rclrs::SpinOptions::default();
+            spin_options.timeout = Some(Duration::from_millis(10));
+            spin_options.only_next_available_work = true;
+            executor.spin(spin_options);
+
+            match promise.try_recv() {
+                Ok(Some(r)) => break r,
+                Ok(None) => {
+                    // 服务响应还未到达，继续等待
                     continue;
+                }
+                Err(e) => {
+                    return Err(anyhow::anyhow!("YOLO service call failed: {:?}", e));
                 }
             }
         };
@@ -267,12 +278,17 @@ impl NaviSubNode {
     }
 
     /// 阻塞调用 OCR 服务
-    pub fn call_ocr_blocking(&self, timeout: Duration) -> anyhow::Result<OCR_Response> {
+    pub fn call_ocr_blocking(
+        &self,
+        executor: &mut rclrs::Executor,
+        timeout: Duration,
+    ) -> anyhow::Result<OCR_Response> {
         log_info!("navi", "Calling OCR service (blocking)...");
 
         let request = OCR_Request::default();
 
         // 使用阻塞调用：等待 Promise 完成并获取响应
+        log_info!("navi", "calling ocr service");
         let mut promise = self
             .ocr_client
             .call(&request)
@@ -287,14 +303,20 @@ impl NaviSubNode {
                 ));
             }
 
-            let maybe = promise
-                .try_recv()
-                .map_err(|e| anyhow::anyhow!("Receiving OCR service response error: {:?}", e))?;
-            match maybe {
-                Some(r) => break r,
-                None => {
-                    std::thread::sleep(Duration::from_millis(10));
+            // 需要 spin executor 来处理服务响应
+            let mut spin_options = rclrs::SpinOptions::default();
+            spin_options.timeout = Some(Duration::from_millis(10));
+            spin_options.only_next_available_work = true;
+            executor.spin(spin_options);
+
+            match promise.try_recv() {
+                Ok(Some(r)) => break r,
+                Ok(None) => {
+                    // 服务响应还未到达，继续等待
                     continue;
+                }
+                Err(e) => {
+                    return Err(anyhow::anyhow!("OCR service call failed: {:?}", e));
                 }
             }
         };
