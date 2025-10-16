@@ -11,7 +11,6 @@
     <xacro:property name="camera_y_offset" value="0.08" />  <!-- 两侧偏移距离 -->
     <xacro:property name="camera_z" value="${base_link_length / 2 + camera_height / 2}" />
 
-
     <!-- 摄像头宏定义 - 可重复使用 -->
     <xacro:macro name="camera_module" params="name parent_link x y z yaw">
         <!-- 摄像头 Link -->
