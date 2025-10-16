@@ -143,13 +143,13 @@ class VisionNode(Node):
             return response
         
         # 使用camera1的图像进行YOLO检测
-        if self.camera1_image is None:
+        if self.camera2_image is None:
             response.success = False
             response.message = "Camera1图像未接收"
             return response
         
         try:
-            frame = self.camera1_image.copy()
+            frame = self.camera2_image.copy()
             
             # YOLO检测
             results = self.yolo_model(frame)
@@ -212,13 +212,13 @@ class VisionNode(Node):
             return response
         
         # 使用camera2的图像进行OCR识别
-        if self.camera2_image is None:
+        if self.camera1_image is None:
             response.success = False
             response.message = "Camera2图像未接收"
             return response
         
         try:
-            frame = self.camera2_image.copy()
+            frame = self.camera1_image.copy()
             
             # OCR识别
             result = self.ocr_engine.ocr(frame, cls=True)

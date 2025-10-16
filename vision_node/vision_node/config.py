@@ -23,6 +23,16 @@ GREEN_MODEL = {
     "use_gpu": False,
 }
 
+# Blue模型配置（自定义训练的本地模型）
+BLUE_MODEL = {
+    "det_model_dir": os.path.join(OCR_DIR, "model", "blue", "det", "infer"),
+    "rec_model_dir": os.path.join(OCR_DIR, "model", "blue", "rec", "infer"),
+    "rec_char_dict_path": os.path.join(OCR_DIR, "ppocr", "utils", "ppocr_keys_v1.txt"),
+    "use_angle_cls": False,
+    "lang": "ch",
+    "use_gpu": False,
+}
+
 # 默认PaddleOCR模型配置（在线下载）
 DEFAULT_MODEL = {
     "use_angle_cls": True,
@@ -34,7 +44,7 @@ DEFAULT_MODEL = {
 
 # 当前使用的模型配置
 # 可以在这里切换：GREEN_MODEL 或 DEFAULT_MODEL
-CURRENT_MODEL = GREEN_MODEL
+CURRENT_MODEL = BLUE_MODEL
 
 # OCR结果保存目录（保存到源码目录）
 OCR_SAVE_DIR = os.path.join(OCR_DIR, "inference_results")

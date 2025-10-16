@@ -22,7 +22,7 @@ fn main() -> anyhow::Result<()> {
             rotation: CoordUnit(0.0, 0.0, 0.0),
         },
         Pos {
-            translation: CoordUnit(2.5, 1.3, 0.0),
+            translation: CoordUnit(2.4, 1.3, 0.0),
             rotation: CoordUnit(0.0, 0.0, 0.0),
         },
     ];
