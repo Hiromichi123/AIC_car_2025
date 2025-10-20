@@ -50,14 +50,14 @@ CURRENT_MODEL = BLUE_MODEL
 OCR_SAVE_DIR = os.path.join(OCR_DIR, "inference_results")
 
 # YOLO配置（使用源码目录的绝对路径）
-YOLO_MODEL_PATH = os.path.join(YOLO_DIR, "best.pt")
+YOLO_MODEL_PATH = os.path.join(YOLO_DIR, "best2.pt")
 YOLO_FONT_PATH = os.path.join(YOLO_DIR, "NotoSansSC-VariableFont_wght.ttf")
 YOLO_SAVE_DIR = os.path.join(YOLO_DIR, "results")
 
-# 自定义YOLO标签
+# 自定义YOLO标签（参考test2_new.py）
 YOLO_LABELS = {
-    1: "社区内人员",
-    2: "非社区人员"
+    0: "社区内人员",
+    1: "非社区人员"
 }
 
 # 调试信息：打印路径
