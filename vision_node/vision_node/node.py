@@ -200,7 +200,7 @@ class VisionNode(Node):
         self.get_logger().info(f"📸 已保存{camera_name}原始图像: {raw_path}")
         
         # YOLO检测
-        results = self.yolo_model(frame)
+        results = self.yolo_model(frame) # type: ignore
         boxes = results[0].boxes
         
         # 转换为PIL图像以绘制中文（参考test2_new.py）
@@ -225,7 +225,7 @@ class VisionNode(Node):
             # 根据类别设置颜色（参考test2_new.py）
             # cls_id == 0: 社区内人员 -> 红色 (255, 0, 0)
             # cls_id == 1: 非社区人员 -> 绿色 (0, 255, 0)
-            color = (0, 255, 0) if cls_id == 1 else (255, 0, 0)
+            color = (255, 0, 0) if cls_id == 1 else (0, 255, 0)
             
             # 绘制矩形框
             draw.rectangle([x1, y1, x2, y2], outline=color, width=3)
