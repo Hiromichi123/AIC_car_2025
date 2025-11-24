@@ -1,23 +1,25 @@
 #ifndef RIKI_BASE_H
 #define RIKI_BASE_H
 
-#include <ros/ros.h>
-#include <string.h>
-#include <tf/transform_broadcaster.h>
-using namespace std;
-class RobotBase {
-public:
-    RobotBase(ros::NodeHandle nh,ros::NodeHandle nh_private);
+#include <rclcpp/rclcpp.hpp>
+#include <string>
+#include <tf2_ros/transform_broadcaster.h>
+#include <geometry_msgs/msg/twist.hpp>
+#include <nav_msgs/msg/odometry.hpp>
 
-    void velCallback(const geometry_msgs::Twist twist);
+using namespace std;
+
+class RobotBase : public rclcpp::Node {
+public:
+    RobotBase();
+
+    void velCallback(const geometry_msgs::msg::Twist::SharedPtr twist);
 
 private:
-    ros::NodeHandle nh_;
-    ros::NodeHandle nh_private;
-    ros::Publisher odom_publisher_;
-    ros::Subscriber velocity_subscriber_;
-    ros::Time last_vel_time_;
-    tf::TransformBroadcaster odom_broadcaster_;
+    rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_publisher_;
+    rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr velocity_subscriber_;
+    rclcpp::Time last_vel_time_;
+    std::shared_ptr<tf2_ros::TransformBroadcaster> odom_broadcaster_;
     string odom_frame;
     string base_footprint_frame;
     double linear_scale_x;
