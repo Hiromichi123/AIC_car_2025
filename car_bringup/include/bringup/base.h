@@ -7,8 +7,6 @@
 #include <geometry_msgs/msg/twist.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 
-using namespace std;
-
 class RobotBase : public rclcpp::Node {
 public:
     RobotBase();
@@ -20,8 +18,8 @@ private:
     rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr velocity_subscriber_;
     rclcpp::Time last_vel_time_;
     std::shared_ptr<tf2_ros::TransformBroadcaster> odom_broadcaster_;
-    string odom_frame;
-    string base_footprint_frame;
+    std::string odom_frame;
+    std::string base_footprint_frame;
     double linear_scale_x;
     double linear_scale_y;
     double vel_dt_;
