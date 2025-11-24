@@ -1,0 +1,33 @@
+# ROS2 Parameters for car_bringup
+# Replaces dynamic_reconfigure from ROS1
+
+# PID Parameters
+pid_params:
+  Kp: 1.5
+  Ki: 0.3
+  Kd: 0.2
+  linear_max: 0.4
+  angular_max: 2.0
+  linear_min: 0.0
+  angular_min: 0.0
+
+# Calibrate Angular Parameters
+calibrate_angular:
+  test_angle: 360.0
+  speed: 2.0
+  tolerance: 1.5
+  odom_angular_scale_correction: 1.0
+  start_test: false
+
+# Calibrate Linear Parameters
+calibrate_linear:
+  direction: 1  # 0 for Y, 1 for X
+  test_distance: 1.0
+  speed: 0.3
+  tolerance: 0.03
+  odom_linear_scale_correction: 1.0
+  start_test: false
+
+# Patrol Parameters (if needed)
+# patrol_params:
+#   Add patrol parameters here when needed
