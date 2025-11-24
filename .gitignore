@@ -25,3 +25,6 @@ dist/
 # OS
 .DS_Store
 Thumbs.db
+
+# CodeQL
+_codeql_detected_source_root
