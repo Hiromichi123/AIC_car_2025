@@ -1,45 +1,24 @@
-"""
-Launch file for real robot mode.
-
-This launch file starts the necessary nodes for running on the real robot hardware:
-- lidar_data_node: Converts PointLIO odometry to LidarPose format
-- bsp_node: Position controller for goal tracking
-- hardware_bridge_node: Serial communication bridge to motor controller
-
-Usage:
-  ros2 launch ros2_tools real_robot.launch.py
-  
-With custom serial port:
-  ros2 launch ros2_tools real_robot.launch.py serial_port:=/dev/ttyUSB1
-"""
-
 from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 
-
 def generate_launch_description():
-    # Declare launch arguments
     serial_port_arg = DeclareLaunchArgument(
         'serial_port',
-        default_value='/dev/ttyUSB0',
-        description='Serial port for motor controller communication'
+        default_value='/dev//dev/ttyCH341USB0',
     )
     
     baud_rate_arg = DeclareLaunchArgument(
         'baud_rate',
         default_value='115200',
-        description='Baud rate for serial communication'
     )
     
     enable_serial_arg = DeclareLaunchArgument(
         'enable_serial',
         default_value='true',
-        description='Enable serial communication (set to false for testing)'
     )
 
-    # LidarDataNode - processes PointLIO odometry for real robot
     lidar_data_node = Node(
         package='ros2_tools',
         executable='lidar_data_node',
@@ -77,6 +56,24 @@ def generate_launch_description():
             'robot_width': 0.25,
         }]
     )
+
+        # d435 = Node(
+    #     package='realsense2_camera',
+    #     executable='realsense2_camera_node',
+    #     name='camera',
+    #     parameters=[{
+    #         'enable_color': True,
+    #         'enable_depth': True,
+    #         'rgb_camera.color_profile': '848x480x30',
+    #         'depth_module.depth_profile': '848x480x30',
+    #         'enable_infra1': True,
+    #         'enable_infra2': True,
+    #         'enable_sync': True, # 同步深度和彩色图像
+    #         #'aligen_depth.enable': True, # 深度图对齐彩色图
+    #         'rgb_camera.power_line_frequency': 2,
+    #     }],
+    #     output='screen'
+    # )
 
     return LaunchDescription([
         serial_port_arg,
