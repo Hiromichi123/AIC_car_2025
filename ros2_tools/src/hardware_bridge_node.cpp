@@ -26,6 +26,7 @@
 #include <fcntl.h>
 #include <termios.h>
 #include <unistd.h>
+#include <cerrno>
 #include <cstring>
 #include <cmath>
 #include <vector>
@@ -46,6 +47,9 @@ constexpr double ROBOT_WIDTH = 0.25;      // Width from center to wheel (left-ri
 class HardwareBridgeNode : public rclcpp::Node {
 public:
     HardwareBridgeNode() : Node("hardware_bridge_node"), serial_fd_(-1) {
+        // Initialize last_cmd_time_ to current time to prevent undefined behavior
+        last_cmd_time_ = this->now();
+        
         // Declare parameters
         this->declare_parameter<std::string>("serial_port", "/dev/ttyUSB0");
         this->declare_parameter<int>("baud_rate", 115200);
@@ -157,11 +161,19 @@ private:
         // Store latest command and update timestamp
         latest_cmd_ = *msg;
         last_cmd_time_ = this->now();
+        cmd_received_ = true;  // Mark that we've received commands
 
-        // Apply speed limits
+        // Apply speed limits with warning if clamping occurs
         double vx = std::clamp(msg->linear.x, -max_linear_speed_, max_linear_speed_);
         double vy = std::clamp(msg->linear.y, -max_linear_speed_, max_linear_speed_);
         double omega = std::clamp(msg->angular.z, -max_angular_speed_, max_angular_speed_);
+
+        // Log warning if commands were clamped
+        if (vx != msg->linear.x || vy != msg->linear.y || omega != msg->angular.z) {
+            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+                "Velocity command clamped: vx %.2f->%.2f, vy %.2f->%.2f, omega %.2f->%.2f",
+                msg->linear.x, vx, msg->linear.y, vy, msg->angular.z, omega);
+        }
 
         // Convert to mecanum wheel velocities
         calculateWheelSpeeds(vx, vy, omega);
@@ -203,7 +215,11 @@ private:
         ssize_t written = write(serial_fd_, packet.data(), packet.size());
         if (written < 0) {
             RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
-                "Failed to write to serial port");
+                "Failed to write to serial port: error %d", errno);
+        } else if (static_cast<size_t>(written) != packet.size()) {
+            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+                "Partial write to serial port: wrote %zd of %zu bytes", 
+                written, packet.size());
         }
     }
 
@@ -242,17 +258,14 @@ private:
     void watchdogCallback() {
         // Check if we haven't received commands for a while
         auto elapsed = this->now() - last_cmd_time_;
-        if (elapsed.seconds() > 0.5) {
+        if (elapsed.seconds() > 0.5 && cmd_received_) {
             // Stop motors
             std::fill(wheel_speeds_.begin(), wheel_speeds_.end(), 0.0);
             
-            static bool warned = false;
-            if (!warned && enable_serial_) {
-                RCLCPP_WARN(this->get_logger(), 
-                    "No cmd_vel received for %.1f seconds, stopping motors", 
-                    elapsed.seconds());
-                warned = true;
-            }
+            // Use throttle to prevent log spam, but still warn periodically
+            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
+                "No cmd_vel received for %.1f seconds, motors stopped", 
+                elapsed.seconds());
         }
     }
 
@@ -273,6 +286,7 @@ private:
     geometry_msgs::msg::Twist latest_cmd_;
     rclcpp::Time last_cmd_time_;
     std::array<double, 4> wheel_speeds_ = {0.0, 0.0, 0.0, 0.0};
+    bool cmd_received_ = false;  // Track if we've ever received a cmd_vel
 
     // ROS interfaces
     rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_sub_;
