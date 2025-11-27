@@ -5,4 +5,4 @@
 /log
 __pycache__
 results
-inference_results
+inference_results_codeql*
