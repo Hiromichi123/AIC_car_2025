@@ -17,6 +17,7 @@ find_package(tf2 REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(realsense2 REQUIRED)
@@ -33,6 +34,7 @@ add_executable(lidar_data_node src/lidar_data_node.cpp)
 add_executable(ground_camera_node src/ground_camera_node.cpp)
 add_executable(d435_node src/d435_node.cpp)
 add_executable(bsp_node src/bsp_node.cpp)
+add_executable(hardware_bridge_node src/hardware_bridge_node.cpp)
 
 target_include_directories(lidar_data_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -49,6 +51,7 @@ ament_target_dependencies(lidar_data_node rclcpp geometry_msgs tf2 tf2_geometry_
 ament_target_dependencies(ground_camera_node rclcpp sensor_msgs OpenCV cv_bridge)
 ament_target_dependencies(d435_node rclcpp sensor_msgs OpenCV cv_bridge realsense2)
 ament_target_dependencies(bsp_node rclcpp geometry_msgs tf2 tf2_geometry_msgs nav_msgs)
+ament_target_dependencies(hardware_bridge_node rclcpp geometry_msgs nav_msgs std_msgs)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -61,6 +64,7 @@ install(TARGETS lidar_data_node DESTINATION lib/${PROJECT_NAME})
 install(TARGETS d435_node DESTINATION lib/${PROJECT_NAME})
 install(TARGETS ground_camera_node DESTINATION lib/${PROJECT_NAME})
 install(TARGETS bsp_node DESTINATION lib/${PROJECT_NAME})
+install(TARGETS hardware_bridge_node DESTINATION lib/${PROJECT_NAME})
 install(DIRECTORY msg DESTINATION share/${PROJECT_NAME})
 install(DIRECTORY launch DESTINATION share/${PROJECT_NAME}/) # 安装 launch 文件
 
