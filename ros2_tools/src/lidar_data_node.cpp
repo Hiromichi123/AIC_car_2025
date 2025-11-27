@@ -9,38 +9,54 @@
 
 class LidarDataNode : public rclcpp::Node {
 public:
-    bool using_gazebo = true; // TODO:最好改为启动参数
-
     LidarDataNode() : Node("lidar_data_node") {
+        // Declare parameters for mode selection
+        this->declare_parameter<bool>("use_simulation", true);
+        this->declare_parameter<std::string>("simulation_odom_topic", "/absolute_pose");
+        this->declare_parameter<std::string>("real_robot_odom_topic", "/aft_mapped_to_init");
+        
+        // Get parameters
+        using_gazebo_ = this->get_parameter("use_simulation").as_bool();
+        std::string sim_topic = this->get_parameter("simulation_odom_topic").as_string();
+        std::string real_topic = this->get_parameter("real_robot_odom_topic").as_string();
+        
         rclcpp::QoS qos_profile = rclcpp::QoS(rclcpp::KeepLast(10)).best_effort();
-        // LidarPose 发布
+        
+        // LidarPose publisher
         lidar_pub = this->create_publisher<ros2_tools::msg::LidarPose>("lidar_data", 10);
         RCLCPP_INFO(this->get_logger(), "lidar_data publisher created");
 
-        // aft_mapped_to_init 订阅 PointLIO 版
-        odom_sub = this->create_subscription<nav_msgs::msg::Odometry>("/aft_mapped_to_init", 10, std::bind(&LidarDataNode::odomCallback, this, std::placeholders::_1));
-        RCLCPP_INFO(this->get_logger(), "aft_mapped_to_init subscription successful.");
+        // Subscribe to PointLIO odometry (real robot mode)
+        odom_sub = this->create_subscription<nav_msgs::msg::Odometry>(
+            real_topic, 10, 
+            std::bind(&LidarDataNode::odomCallback, this, std::placeholders::_1));
+        RCLCPP_INFO(this->get_logger(), "Real robot odometry subscription: %s", real_topic.c_str());
 
-        // gazebo 麦轮自定义话题
-        local_position_sub = this->create_subscription<nav_msgs::msg::Odometry>("/absolute_pose", 10, std::bind(&LidarDataNode::localPositionCallback, this, std::placeholders::_1));
-        RCLCPP_INFO(this->get_logger(),"Gazebo Odom subscription successful.");
+        // Subscribe to Gazebo odometry (simulation mode)
+        local_position_sub = this->create_subscription<nav_msgs::msg::Odometry>(
+            sim_topic, 10, 
+            std::bind(&LidarDataNode::localPositionCallback, this, std::placeholders::_1));
+        RCLCPP_INFO(this->get_logger(), "Simulation odometry subscription: %s", sim_topic.c_str());
+        
+        RCLCPP_INFO(this->get_logger(), "LidarDataNode initialized in %s mode", 
+            using_gazebo_ ? "SIMULATION" : "REAL ROBOT");
     }
 
-    // lidar数据回调
+    // Real robot lidar odometry callback
     void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg) {
-        if (!using_gazebo)
-            msgDispose(msg->pose.pose); // 实机模式，处理雷达数据
+        if (!using_gazebo_)
+            msgDispose(msg->pose.pose); // Real robot mode - process lidar data
     }
 
-    // 仿真数据回调
+    // Simulation odometry callback
     void localPositionCallback(const nav_msgs::msg::Odometry::SharedPtr msg) {
-        if (using_gazebo)
-            msgDispose(msg->pose.pose); // 仿真模式，处理轮式里程计数据
+        if (using_gazebo_)
+            msgDispose(msg->pose.pose); // Simulation mode - process wheel odometry
     }
 
-    // msg统一处理函数
+    // Unified message processing function
     void msgDispose(const geometry_msgs::msg::Pose &pose) {
-        // 转换四元数为欧拉角
+        // Convert quaternion to Euler angles
         double x = pose.position.x;
         double y = pose.position.y;
         double z = pose.position.z;
@@ -50,12 +66,12 @@ public:
         double roll, pitch, yaw;
         m.getRPY(roll, pitch, yaw);
 
-        // 正向归一化
+        // Normalize angles to positive range
         if (roll < 0) roll += 2 * M_PI;
         if (pitch < 0) pitch += 2 * M_PI;
         if (yaw < 0) yaw += 2 * M_PI;
 
-        // 填充LidarPose消息
+        // Fill LidarPose message
         lidar_pose.x = x;
         lidar_pose.y = y;
         lidar_pose.z = z;
@@ -69,12 +85,15 @@ public:
         if (++counter >= 50) {
             RCLCPP_INFO(
                 this->get_logger(),
-                "Position=(%.2f, %.2f, %.2f), Orientation=(%.2f, %.2f, %.2f) rad", x, y, z, roll, pitch, yaw);
+                "Position=(%.2f, %.2f, %.2f), Orientation=(%.2f, %.2f, %.2f) rad", 
+                x, y, z, roll, pitch, yaw);
                 counter = 0;
         }
     }
 
 private:
+    bool using_gazebo_;
+    
     rclcpp::Publisher<ros2_tools::msg::LidarPose>::SharedPtr lidar_pub;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr local_position_sub;
@@ -85,7 +104,7 @@ private:
 int main(int argc, char **argv) {
     rclcpp::init(argc, argv);
     auto node = std::make_shared<LidarDataNode>();
-    RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Lidar_data_node completed");
+    RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Lidar_data_node started");
     rclcpp::spin(node);
     rclcpp::shutdown();
     return 0;
