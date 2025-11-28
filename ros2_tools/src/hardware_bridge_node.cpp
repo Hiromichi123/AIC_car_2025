@@ -1,21 +1,14 @@
 /**
- * @file hardware_bridge_node.cpp
- * @brief ROS2 Hardware Bridge Node for Real Robot Motor Control
- * 
- * This node serves as the middleware conversion layer between ROS2 cmd_vel
- * commands and the real robot's low-level motor controller protocol.
- * 
- * It handles:
- * - Serial communication with motor controller
- * - Velocity command conversion (cmd_vel -> motor commands)
- * - Encoder feedback processing (if available)
- * - Mecanum wheel kinematics for omnidirectional movement
- * 
- * Protocol format (configurable):
- * - Header: 0xAA 0x55
- * - Command type: 1 byte
- * - Payload: variable length
- * - Checksum: 1 byte (XOR of all payload bytes)
+ * 功能:
+ * - 串口通信与电机控制器
+ * - 速度命令转换 (cmd_vel -> 底盘协议)
+ * - 编码器反馈处理 (暂无)
+ *
+ * 与 Python 版底盘驱动保持一致的协议:
+ * - 固定帧头: 0xAA 0xBB 0x0A 0x12 0x02
+ * - 负载: Vx、Vy、Omega（三个 16 位有符号整数，小端，单位 0.001）
+ * - 结束字节: 0x00
+ * - 启动握手: 上电后发送 0x11 + 9 个 0x00
  */
 
 #include <rclcpp/rclcpp.hpp>
@@ -32,72 +25,71 @@
 #include <vector>
 #include <array>
 
-// Protocol constants
-constexpr uint8_t PROTOCOL_HEADER_1 = 0xAA;
-constexpr uint8_t PROTOCOL_HEADER_2 = 0x55;
-constexpr uint8_t CMD_VELOCITY = 0x01;
-constexpr uint8_t CMD_STOP = 0x02;
-constexpr uint8_t CMD_QUERY_STATUS = 0x03;
+// 默认串口
+constexpr char DEFAULT_SERIAL_PORT[] = "/dev/ttyCH341USB0";
+constexpr int DEFAULT_BAUD_RATE = 115200;
 
-// Mecanum wheel geometry (in meters)
-constexpr double WHEEL_RADIUS = 0.05;     // 50mm wheel radius
-constexpr double ROBOT_LENGTH = 0.3;      // Length from center to wheel (front-back)
-constexpr double ROBOT_WIDTH = 0.25;      // Width from center to wheel (left-right)
+// 协议定义
+constexpr uint8_t PROTOCOL_HEADER_1 = 0xAA;
+constexpr uint8_t PROTOCOL_HEADER_2 = 0xBB;
+constexpr uint8_t PROTOCOL_CMD_BYTE_1 = 0x0A;
+constexpr uint8_t PROTOCOL_CMD_BYTE_2 = 0x12;
+constexpr uint8_t PROTOCOL_CMD_BYTE_3 = 0x02;
+constexpr uint8_t PROTOCOL_TAIL = 0x00;
+constexpr double VELOCITY_SCALE = 1000.0;
+constexpr std::array<uint8_t, 10> STARTUP_SEQUENCE = {0x11, 0x00, 0x00, 0x00, 0x00,
+                                                     0x00, 0x00, 0x00, 0x00, 0x00};
+
+// 默认速度限制
+constexpr double MAX_LINEAR_SPEED = 0.5;   // m/s
+constexpr double MAX_ANGULAR_SPEED = 1.0;  // rad/s
 
 class HardwareBridgeNode : public rclcpp::Node {
 public:
     HardwareBridgeNode() : Node("hardware_bridge_node"), serial_fd_(-1) {
-        // Initialize last_cmd_time_ to current time to prevent undefined behavior
+        // 初始化 last_cmd_time_ 为当前时间，防止ub
         last_cmd_time_ = this->now();
         
-        // Declare parameters
-        this->declare_parameter<std::string>("serial_port", "/dev/ttyUSB0");
-        this->declare_parameter<int>("baud_rate", 115200);
-        this->declare_parameter<bool>("enable_serial", true);
-        this->declare_parameter<double>("max_linear_speed", 1.0);  // m/s
-        this->declare_parameter<double>("max_angular_speed", 2.0); // rad/s
-        this->declare_parameter<double>("wheel_radius", WHEEL_RADIUS);
-        this->declare_parameter<double>("robot_length", ROBOT_LENGTH);
-        this->declare_parameter<double>("robot_width", ROBOT_WIDTH);
-
-        // Get parameters
+        // 声明参数
+        this->declare_parameter<std::string>("serial_port", DEFAULT_SERIAL_PORT);
+        this->declare_parameter<int>("baud_rate", DEFAULT_BAUD_RATE);
+        this->declare_parameter<double>("max_linear_speed", MAX_LINEAR_SPEED);
+        this->declare_parameter<double>("max_angular_speed", MAX_ANGULAR_SPEED);
+        // 获取参数
         serial_port_ = this->get_parameter("serial_port").as_string();
         baud_rate_ = this->get_parameter("baud_rate").as_int();
-        enable_serial_ = this->get_parameter("enable_serial").as_bool();
         max_linear_speed_ = this->get_parameter("max_linear_speed").as_double();
         max_angular_speed_ = this->get_parameter("max_angular_speed").as_double();
-        wheel_radius_ = this->get_parameter("wheel_radius").as_double();
-        robot_length_ = this->get_parameter("robot_length").as_double();
-        robot_width_ = this->get_parameter("robot_width").as_double();
 
-        // Initialize serial port if enabled
+        // 初始化串口
+        enable_serial_ = true;
         if (enable_serial_) {
             if (!initSerial()) {
                 RCLCPP_ERROR(this->get_logger(), 
-                    "Failed to open serial port %s. Running in simulation mode.", 
+                    "无法打开串口 %s，运行仿真模式。", 
                     serial_port_.c_str());
                 enable_serial_ = false;
             } else {
                 RCLCPP_INFO(this->get_logger(), 
-                    "Serial port %s opened successfully at %d baud", 
+                    "串口 %s 成功打开，波特率 %d", 
                     serial_port_.c_str(), baud_rate_);
             }
         }
 
-        // Create subscriber for velocity commands
+        // 从bsp订阅速度
         cmd_vel_sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
             "/cmd_vel", 10,
             std::bind(&HardwareBridgeNode::cmdVelCallback, this, std::placeholders::_1));
 
-        // Create publisher for debug/status messages
+        // 发布状态上下文
         status_pub_ = this->create_publisher<std_msgs::msg::String>("/hardware_status", 10);
 
-        // Create timer for sending commands at fixed rate (50Hz)
+        // cmd定时器 50hz
         send_timer_ = this->create_wall_timer(
             std::chrono::milliseconds(20),
             std::bind(&HardwareBridgeNode::sendCommandTimer, this));
 
-        // Watchdog timer - stop motors if no cmd_vel received for 500ms
+        // 看门狗定时器 - 如果500ms内未收到cmd_vel，则停止电机
         watchdog_timer_ = this->create_wall_timer(
             std::chrono::milliseconds(100),
             std::bind(&HardwareBridgeNode::watchdogCallback, this));
@@ -109,7 +101,7 @@ public:
     }
 
     ~HardwareBridgeNode() {
-        // Stop motors and close serial port
+        // 析构串口
         if (serial_fd_ >= 0) {
             sendStopCommand();
             close(serial_fd_);
@@ -117,6 +109,7 @@ public:
     }
 
 private:
+    // 舒适化串口
     bool initSerial() {
         serial_fd_ = open(serial_port_.c_str(), O_RDWR | O_NOCTTY | O_NDELAY);
         if (serial_fd_ < 0) {
@@ -126,7 +119,7 @@ private:
         struct termios options;
         tcgetattr(serial_fd_, &options);
 
-        // Set baud rate
+        // 默认br115200
         speed_t baud;
         switch (baud_rate_) {
             case 9600:   baud = B9600;   break;
@@ -146,7 +139,7 @@ private:
         options.c_cflag |= CS8;
         options.c_cflag |= (CLOCAL | CREAD);
 
-        // Raw input
+        // Raw mode
         options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
         options.c_iflag &= ~(IXON | IXOFF | IXANY);
         options.c_oflag &= ~OPOST;
@@ -154,71 +147,47 @@ private:
         tcsetattr(serial_fd_, TCSANOW, &options);
         tcflush(serial_fd_, TCIOFLUSH);
 
+        sendStartupSequence();
+
         return true;
     }
 
     void cmdVelCallback(const geometry_msgs::msg::Twist::SharedPtr msg) {
-        // Store latest command and update timestamp
-        latest_cmd_ = *msg;
+        // 存储最新命令 更新时间戳
         last_cmd_time_ = this->now();
-        cmd_received_ = true;  // Mark that we've received commands
+        cmd_received_ = true;
 
-        // Apply speed limits with warning if clamping occurs
+        // 限速 线速度度和角速度
         double vx = std::clamp(msg->linear.x, -max_linear_speed_, max_linear_speed_);
         double vy = std::clamp(msg->linear.y, -max_linear_speed_, max_linear_speed_);
         double omega = std::clamp(msg->angular.z, -max_angular_speed_, max_angular_speed_);
 
-        // Log warning if commands were clamped
+        // 到达限速警告
         if (vx != msg->linear.x || vy != msg->linear.y || omega != msg->angular.z) {
             RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
                 "Velocity command clamped: vx %.2f->%.2f, vy %.2f->%.2f, omega %.2f->%.2f",
                 msg->linear.x, vx, msg->linear.y, vy, msg->angular.z, omega);
         }
 
-        // Convert to mecanum wheel velocities
-        calculateWheelSpeeds(vx, vy, omega);
-
-        RCLCPP_DEBUG(this->get_logger(), 
-            "cmd_vel: vx=%.2f, vy=%.2f, omega=%.2f", vx, vy, omega);
-    }
-
-    /**
-     * @brief Calculate mecanum wheel speeds from robot velocity
-     * 
-     * Mecanum wheel kinematics:
-     * v_fl = (vx - vy - (L+W)*omega) / R
-     * v_fr = (vx + vy + (L+W)*omega) / R
-     * v_rl = (vx + vy - (L+W)*omega) / R
-     * v_rr = (vx - vy + (L+W)*omega) / R
-     * 
-     * Where L = robot_length, W = robot_width, R = wheel_radius
-     */
-    void calculateWheelSpeeds(double vx, double vy, double omega) {
-        double L_plus_W = robot_length_ + robot_width_;
-        
-        // Calculate wheel angular velocities (rad/s)
-        wheel_speeds_[0] = (vx - vy - L_plus_W * omega) / wheel_radius_; // Front Left
-        wheel_speeds_[1] = (vx + vy + L_plus_W * omega) / wheel_radius_; // Front Right
-        wheel_speeds_[2] = (vx + vy - L_plus_W * omega) / wheel_radius_; // Rear Left
-        wheel_speeds_[3] = (vx - vy + L_plus_W * omega) / wheel_radius_; // Rear Right
+        current_vx_ = vx;
+        current_vy_ = vy;
+        current_omega_ = omega;
     }
 
     void sendCommandTimer() {
-        if (!enable_serial_ || serial_fd_ < 0) {
-            return;
-        }
+        if (!enable_serial_ || serial_fd_ < 0) return;
 
-        // Build and send velocity command packet
+        // 构建并发送速度命令包
         std::vector<uint8_t> packet;
         buildVelocityPacket(packet);
         
         ssize_t written = write(serial_fd_, packet.data(), packet.size());
         if (written < 0) {
             RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
-                "Failed to write to serial port: error %d", errno);
+                "写入串口失败，错误码 %d", errno);
         } else if (static_cast<size_t>(written) != packet.size()) {
             RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
-                "Partial write to serial port: wrote %zd of %zu bytes", 
+                "写入串口不完整：写入了 %zd 字节，共 %zu 字节", 
                 written, packet.size());
         }
     }
@@ -227,49 +196,77 @@ private:
         packet.clear();
         packet.push_back(PROTOCOL_HEADER_1);
         packet.push_back(PROTOCOL_HEADER_2);
-        packet.push_back(CMD_VELOCITY);
-        
-        // Send 4 wheel speeds as 16-bit signed integers (in units of 0.01 rad/s)
-        uint8_t checksum = CMD_VELOCITY;
-        for (int i = 0; i < 4; i++) {
-            int16_t speed_int = static_cast<int16_t>(wheel_speeds_[i] * 100.0);
-            uint8_t high = (speed_int >> 8) & 0xFF;
-            uint8_t low = speed_int & 0xFF;
-            packet.push_back(high);
-            packet.push_back(low);
-            checksum ^= high;
-            checksum ^= low;
-        }
-        packet.push_back(checksum);
+        packet.push_back(PROTOCOL_CMD_BYTE_1);
+        packet.push_back(PROTOCOL_CMD_BYTE_2);
+        packet.push_back(PROTOCOL_CMD_BYTE_3);
+
+        appendInt16LE(packet, toProtocolValue(current_vx_));
+        appendInt16LE(packet, toProtocolValue(current_vy_));
+        appendInt16LE(packet, toProtocolValue(current_omega_));
+
+        packet.push_back(PROTOCOL_TAIL);
     }
 
+    // 发送停止命令
     void sendStopCommand() {
         if (serial_fd_ < 0) return;
 
-        std::vector<uint8_t> packet;
-        packet.push_back(PROTOCOL_HEADER_1);
-        packet.push_back(PROTOCOL_HEADER_2);
-        packet.push_back(CMD_STOP);
-        packet.push_back(CMD_STOP);  // Checksum is just the command byte
+        double prev_vx = current_vx_;
+        double prev_vy = current_vy_;
+        double prev_omega = current_omega_;
 
+        current_vx_ = 0.0;
+        current_vy_ = 0.0;
+        current_omega_ = 0.0;
+
+        std::vector<uint8_t> packet;
+        buildVelocityPacket(packet);
         write(serial_fd_, packet.data(), packet.size());
+
+        current_vx_ = prev_vx;
+        current_vy_ = prev_vy;
+        current_omega_ = prev_omega;
     }
 
     void watchdogCallback() {
-        // Check if we haven't received commands for a while
+        // 检查是否长时间未收到命令（2hz）
         auto elapsed = this->now() - last_cmd_time_;
         if (elapsed.seconds() > 0.5 && cmd_received_) {
-            // Stop motors
-            std::fill(wheel_speeds_.begin(), wheel_speeds_.end(), 0.0);
+            current_vx_ = 0.0;
+            current_vy_ = 0.0;
+            current_omega_ = 0.0;
             
-            // Use throttle to prevent log spam, but still warn periodically
             RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
-                "No cmd_vel received for %.1f seconds, motors stopped", 
+                "长时间未收到 cmd_vel（%.1f 秒），电机已停止", 
                 elapsed.seconds());
         }
     }
 
-    // Serial communication
+    int16_t toProtocolValue(double value) const {
+        double scaled = std::round(value * VELOCITY_SCALE);
+        if (scaled > 32767.0) scaled = 32767.0;
+        if (scaled < -32768.0) scaled = -32768.0;
+        return static_cast<int16_t>(scaled);
+    }
+
+    void appendInt16LE(std::vector<uint8_t>& packet, int16_t value) const {
+        packet.push_back(static_cast<uint8_t>(value & 0xFF));
+        packet.push_back(static_cast<uint8_t>((value >> 8) & 0xFF));
+    }
+
+    void sendStartupSequence() {
+        if (serial_fd_ < 0) return;
+        ssize_t written = write(serial_fd_, STARTUP_SEQUENCE.data(), STARTUP_SEQUENCE.size());
+        if (written != static_cast<ssize_t>(STARTUP_SEQUENCE.size())) {
+            RCLCPP_WARN(this->get_logger(),
+                        "写入启动序列不完整：写入了 %zd 字节，共 %zu 字节",
+                        written,
+                        STARTUP_SEQUENCE.size());
+        }
+        usleep(1000);  // 给控制器 1ms 处理时间
+    }
+
+    // 串口
     int serial_fd_;
     std::string serial_port_;
     int baud_rate_;
@@ -278,17 +275,15 @@ private:
     // Robot parameters
     double max_linear_speed_;
     double max_angular_speed_;
-    double wheel_radius_;
-    double robot_length_;
-    double robot_width_;
+    double current_vx_ = 0.0;
+    double current_vy_ = 0.0;
+    double current_omega_ = 0.0;
 
-    // State
-    geometry_msgs::msg::Twist latest_cmd_;
+    // 状态
     rclcpp::Time last_cmd_time_;
-    std::array<double, 4> wheel_speeds_ = {0.0, 0.0, 0.0, 0.0};
-    bool cmd_received_ = false;  // Track if we've ever received a cmd_vel
-
-    // ROS interfaces
+    bool cmd_received_ = false;  // 记录是否曾接收到 cmd_vel
+    
+    // ros组
     rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_sub_;
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr status_pub_;
     rclcpp::TimerBase::SharedPtr send_timer_;

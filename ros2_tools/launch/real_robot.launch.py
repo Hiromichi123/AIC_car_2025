@@ -6,17 +6,12 @@ from launch.substitutions import LaunchConfiguration
 def generate_launch_description():
     serial_port_arg = DeclareLaunchArgument(
         'serial_port',
-        default_value='/dev//dev/ttyCH341USB0',
+        default_value='/dev/ttyCH341USB0',
     )
     
     baud_rate_arg = DeclareLaunchArgument(
         'baud_rate',
         default_value='115200',
-    )
-    
-    enable_serial_arg = DeclareLaunchArgument(
-        'enable_serial',
-        default_value='true',
     )
 
     lidar_data_node = Node(
@@ -31,7 +26,7 @@ def generate_launch_description():
         }]
     )
 
-    # BSP Node - position controller
+    # BSP 控制器（中间层pid）
     bsp_node = Node(
         package='ros2_tools',
         executable='bsp_node',
@@ -39,7 +34,7 @@ def generate_launch_description():
         output='screen'
     )
 
-    # Hardware Bridge Node - serial communication to motor controller
+    # 硬件桥接节点 - 串口通信
     hardware_bridge_node = Node(
         package='ros2_tools',
         executable='hardware_bridge_node',
@@ -48,12 +43,8 @@ def generate_launch_description():
         parameters=[{
             'serial_port': LaunchConfiguration('serial_port'),
             'baud_rate': LaunchConfiguration('baud_rate'),
-            'enable_serial': LaunchConfiguration('enable_serial'),
-            'max_linear_speed': 1.0,
-            'max_angular_speed': 2.0,
-            'wheel_radius': 0.05,
-            'robot_length': 0.3,
-            'robot_width': 0.25,
+            'max_linear_speed': 0.2,
+            'max_angular_speed': 0.2
         }]
     )
 
@@ -78,7 +69,6 @@ def generate_launch_description():
     return LaunchDescription([
         serial_port_arg,
         baud_rate_arg,
-        enable_serial_arg,
         lidar_data_node,
         bsp_node,
         hardware_bridge_node,

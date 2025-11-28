@@ -1,12 +1,5 @@
 """
-Launch file for simulation mode.
-
-This launch file starts the necessary nodes for running in Gazebo simulation:
-- lidar_data_node: Converts Gazebo odometry to LidarPose format
-- bsp_node: Position controller for goal tracking
-
-Usage:
-  ros2 launch ros2_tools tools.launch.py
+仿真环境下启动LidarDataNode和BSP节点的launch文件
 """
 
 from launch import LaunchDescription
