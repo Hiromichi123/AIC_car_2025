@@ -11,7 +11,6 @@ endif()
 
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(rosidl_default_generators REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
@@ -21,6 +20,8 @@ find_package(std_msgs REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(realsense2 REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
+find_package(rosidl_generator_rs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME} 
   "msg/LidarPose.msg"
@@ -28,7 +29,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/YOLO.srv"
 )
 
-ament_export_dependencies(rosidl_default_runtime)
+ament_export_dependencies(rosidl_default_runtime rosidl_generator_rs) # 导出 Rust 消息接口
 
 add_executable(lidar_data_node src/lidar_data_node.cpp)
 add_executable(ground_camera_node src/ground_camera_node.cpp)

@@ -3,15 +3,13 @@ name = "navi_rs"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 anyhow = "1.0.100"
 tokio = { version = "1.47.1", features = ["sync", "macros", "rt-multi-thread"] }
 rclrs = "*"
 std_msgs = "*"
 geometry_msgs = "*"
-ros2_tools = "*"
+ros2_tools = { path = "../install/ros2_tools/share/ros2_tools/rust" }
 
 [dev-dependencies]
 tokio-test = "0.4"
@@ -19,3 +17,6 @@ tokio-test = "0.4"
 [[bin]]
 name = "navi_rs"
 path = "src/main.rs"
+
+[package.metadata.ros]
+msg = ["ros2_tools"]
