@@ -59,7 +59,7 @@ fn main() -> anyhow::Result<()> {
         },
         Pos {
             translation: CoordUnit(0.6, 3.1, 0.0),
-            rotation: CoordUnit(0.0, 0.0, 1.6),
+            rotation: CoordUnit(0.0, 0.0, 1.57),
         },
     ];
 

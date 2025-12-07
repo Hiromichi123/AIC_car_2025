@@ -43,10 +43,6 @@ constexpr double VELOCITY_SCALE = 1000.0;
 constexpr std::array<uint8_t, 10> STARTUP_SEQUENCE = {0x11, 0x00, 0x00, 0x00, 0x00,
                                                      0x00, 0x00, 0x00, 0x00, 0x00};
 
-// 默认速度限制
-constexpr double MAX_LINEAR_SPEED = 1.5;   // m/s
-constexpr double MAX_ANGULAR_SPEED = 2.0;  // rad/s
-
 class HardwareBridgeNode : public rclcpp::Node {
 public:
     HardwareBridgeNode() : Node("hardware_bridge_node"), serial_fd_(-1) {
@@ -56,13 +52,9 @@ public:
         // 声明参数
         this->declare_parameter<std::string>("serial_port", DEFAULT_SERIAL_PORT);
         this->declare_parameter<int>("baud_rate", DEFAULT_BAUD_RATE);
-        this->declare_parameter<double>("max_linear_speed", MAX_LINEAR_SPEED);
-        this->declare_parameter<double>("max_angular_speed", MAX_ANGULAR_SPEED);
         // 获取参数
         serial_port_ = this->get_parameter("serial_port").as_string();
         baud_rate_ = this->get_parameter("baud_rate").as_int();
-        max_linear_speed_ = this->get_parameter("max_linear_speed").as_double();
-        max_angular_speed_ = this->get_parameter("max_angular_speed").as_double();
 
         // 初始化串口
         enable_serial_ = true;
@@ -82,19 +74,14 @@ public:
         // 发布状态上下文
         status_pub_ = this->create_publisher<std_msgs::msg::String>("/hardware_status", 10);
 
-        // cmd定时器 50hz
-        send_timer_ = this->create_wall_timer(
-            std::chrono::milliseconds(20), std::bind(&HardwareBridgeNode::sendCommandTimer, this));
+        // cmd_vel定时器 50hz
+        send_timer_ = this->create_wall_timer(std::chrono::milliseconds(20), std::bind(&HardwareBridgeNode::sendCommandTimer, this));
 
         // 看门狗定时器 - 如果500ms内未收到cmd_vel，则停止电机
-        watchdog_timer_ = this->create_wall_timer(
-            std::chrono::milliseconds(100),
-            std::bind(&HardwareBridgeNode::watchdogCallback, this));
+        // watchdog_timer_ = this->create_wall_timer(std::chrono::milliseconds(100), std::bind(&HardwareBridgeNode::watchdogCallback, this));
 
         RCLCPP_INFO(this->get_logger(), "硬件桥接节点已启动");
         RCLCPP_INFO(this->get_logger(), "串口: %s", enable_serial_ ? "已启用" : "已禁用");
-        RCLCPP_INFO(this->get_logger(), "当前最大线速度: %.2f m/s", max_linear_speed_);
-        RCLCPP_INFO(this->get_logger(), "当前最大角速度: %.2f rad/s", max_angular_speed_);
     }
 
     ~HardwareBridgeNode() {
@@ -155,22 +142,9 @@ private:
     void cmdVelCallback(const geometry_msgs::msg::Twist::SharedPtr msg) {
         last_cmd_time_ = this->now();
         cmd_received_ = true;
-
-        // 限速 线速度度和角速度
-        double vx = std::clamp(msg->linear.x, -max_linear_speed_, max_linear_speed_);
-        double vy = std::clamp(msg->linear.y, -max_linear_speed_, max_linear_speed_);
-        double omega = std::clamp(msg->angular.z, -max_angular_speed_, max_angular_speed_);
-
-        // 到达限速警告
-        if (vx != msg->linear.x || vy != msg->linear.y || omega != msg->angular.z) {
-            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
-                "到达限速: vx %.2f->%.2f, vy %.2f->%.2f, omega %.2f->%.2f",
-                msg->linear.x, vx, msg->linear.y, vy, msg->angular.z, omega);
-        }
-
-        current_vx_ = vx;
-        current_vy_ = vy;
-        current_omega_ = omega;
+        current_vx_ = msg->linear.x;
+        current_vy_ = msg->linear.y;
+        current_omega_ = msg->angular.z;
     }
 
     // 定时发送速度命令
@@ -226,17 +200,16 @@ private:
         current_omega_ = prev_omega;
     }
 
-    // 检查是否长时间未收到命令（2hz）
-    void watchdogCallback() {
-        auto elapsed = this->now() - last_cmd_time_;
-        if (elapsed.seconds() > 0.5 && cmd_received_) {
-            current_vx_ = 0.0;
-            current_vy_ = 0.0;
-            current_omega_ = 0.0;
-            
-            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000, "长时间未收到 cmd_vel（%.1f 秒），电机已停止", elapsed.seconds());
-        }
-    }
+    // 检查是否长时间未收到命令（2hz）未启用
+    // void watchdogCallback() {
+    //     auto elapsed = this->now() - last_cmd_time_;
+    //     if (elapsed.seconds() > 0.5 && cmd_received_) {
+    //         current_vx_ = 0.0;
+    //         current_vy_ = 0.0;
+    //         current_omega_ = 0.0;
+    //         RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000, "长时间未收到 cmd_vel（%.1f 秒），电机已停止", elapsed.seconds());
+    //     }
+    // }
 
     // 转换为协议值
     int16_t toProtocolValue(double value) const {

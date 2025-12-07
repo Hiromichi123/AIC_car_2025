@@ -1,13 +1,9 @@
-"""
-仿真环境下启动LidarDataNode和BSP节点的launch文件
-"""
-
+"""仿真环境下启动LidarDataNode和BSP节点"""
 from launch import LaunchDescription
 from launch_ros.actions import Node
 
-
 def generate_launch_description():
-    # LidarDataNode - processes Gazebo odometry for simulation
+    # LidarDataNode - 处理激光雷达数据
     lidar_data_node = Node(
         package='ros2_tools',
         executable='lidar_data_node',
@@ -20,7 +16,7 @@ def generate_launch_description():
         }]
     )
 
-    # BSP Node - position controller
+    # BSP Node - pid中间层
     bsp_node = Node(
         package='ros2_tools',
         executable='bsp_node',

@@ -67,6 +67,6 @@ install(TARGETS camera_node DESTINATION lib/${PROJECT_NAME})
 install(TARGETS bsp_node DESTINATION lib/${PROJECT_NAME})
 install(TARGETS hardware_bridge_node DESTINATION lib/${PROJECT_NAME})
 install(DIRECTORY msg DESTINATION share/${PROJECT_NAME})
-install(DIRECTORY launch DESTINATION share/${PROJECT_NAME}/) # 安装 launch 文件
+install(DIRECTORY launch DESTINATION share/${PROJECT_NAME}/)
 
 ament_package()

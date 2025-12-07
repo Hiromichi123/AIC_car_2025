@@ -2,7 +2,7 @@
 
 This repository contains ROS2 packages for the AIC 2025 car robot platform, supporting both simulation (Gazebo) and real robot deployment.
 
-## Architecture Overview
+## 结构总览
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -36,16 +36,6 @@ This repository contains ROS2 packages for the AIC 2025 car robot platform, supp
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-## Packages
-
-### ros2_tools
-Core ROS2 tools and nodes:
-- **lidar_data_node**: odometry -> LidarPose的转换节点
-- **bsp_node**: 位置控制转换为速度控制的PID中间层
-- **hardware_bridge_node**: 串口桥接层，上下位机通信桥接
-- **d435_node**: D435深度相机节点
-- **camera_node**: 普通单目摄像头节点
-
 ## 使用
 
 ### 仿真模式启动
@@ -66,7 +56,7 @@ ros2 run navi_rs navi_rs
 ros2 launch robot_real slam.launch.py
 
 # 启动工具
-ros2 launch ros2_tools tools_real.launch.py serial_port:=/dev/ttyUSB0
+ros2 launch ros2_tools tools_real.launch.py
 
 # 运行测试节点
 ros2 run robot_real simple_goal.launch.py
