@@ -14,6 +14,7 @@ def generate_launch_description():
         default_value='115200',
     )
 
+    # LidarDataNode 雷达数据处理节点
     lidar_data_node = Node(
         package='ros2_tools',
         executable='lidar_data_node',
