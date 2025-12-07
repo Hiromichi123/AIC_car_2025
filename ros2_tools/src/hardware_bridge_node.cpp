@@ -44,8 +44,8 @@ constexpr std::array<uint8_t, 10> STARTUP_SEQUENCE = {0x11, 0x00, 0x00, 0x00, 0x
                                                      0x00, 0x00, 0x00, 0x00, 0x00};
 
 // 默认速度限制
-constexpr double MAX_LINEAR_SPEED = 0.5;   // m/s
-constexpr double MAX_ANGULAR_SPEED = 1.0;  // rad/s
+constexpr double MAX_LINEAR_SPEED = 1.5;   // m/s
+constexpr double MAX_ANGULAR_SPEED = 2.0;  // rad/s
 
 class HardwareBridgeNode : public rclcpp::Node {
 public:

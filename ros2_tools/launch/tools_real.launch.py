@@ -44,8 +44,8 @@ def generate_launch_description():
         parameters=[{
             'serial_port': LaunchConfiguration('serial_port'),
             'baud_rate': LaunchConfiguration('baud_rate'),
-            'max_linear_speed': 0.2,
-            'max_angular_speed': 0.2
+            'max_linear_speed': 1.5,
+            'max_angular_speed': 1.0
         }]
     )
 
