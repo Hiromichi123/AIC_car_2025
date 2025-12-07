@@ -1,3 +1,9 @@
+/*
+ * 功能:
+ * 1.订阅目标点（goal）和 雷达数据（lidar_data）
+ * 2.根据当前位置和目标点计算速度指令（cmd_vel）
+ * 3.发布速度指令给底层控制节点
+ */
 #include "ros2_tools/msg/lidar_pose.hpp"
 #include <cmath>
 #include <geometry_msgs/msg/pose_stamped.hpp>
@@ -6,27 +12,24 @@
 
 class PositionController : public rclcpp::Node {
 public:
-  PositionController()
-      : Node("bsp_node"), Kp_linear_(0.9), Kp_angular_(2.0), has_goal_(false),
-        has_target_yaw_(false), rotating_first_(false),
+  PositionController() : Node("bsp_node"),
+        Kp_linear_(0.9), Kp_angular_(2.0),
         position_threshold_(0.03),     // 3cm 认为到达
         angle_threshold_(0.05),        // ~3° 认为朝向正确
         rotation_first_threshold_(0.2) // 角度误差 > 11° 时先转向
   {
+    // 目标点订阅
     goal_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
-        "/goal", 10,
-        std::bind(&PositionController::goalCallback, this,
-                  std::placeholders::_1));
+        "/goal", 10, std::bind(&PositionController::goalCallback, this, std::placeholders::_1));
 
+    // lidar数据订阅
     lidar_sub_ = this->create_subscription<ros2_tools::msg::LidarPose>(
-        "/lidar_data", 10,
-        std::bind(&PositionController::lidarCallback, this,
-                  std::placeholders::_1));
+        "/lidar_data", 10, std::bind(&PositionController::lidarCallback, this, std::placeholders::_1));
 
-    cmd_pub_ =
-        this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
+    // 底层速度命令发布
+    cmd_pub_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
 
-    RCLCPP_INFO(this->get_logger(), "bsp_node started (planar move mode).");
+    RCLCPP_INFO(this->get_logger(), "bsp_node 中间层已启动，开始接收goal和lidar数据");
   }
 
 private:
@@ -69,13 +72,11 @@ private:
     }
   }
 
+  // 计算并发布cmd_vel
   void computeAndPublish() {
-    double dx_global =
-        latest_goal_.pose.position.x - latest_pose_.pose.position.x;
-    double dy_global =
-        latest_goal_.pose.position.y - latest_pose_.pose.position.y;
+    double dx_global = latest_goal_.pose.position.x - latest_pose_.pose.position.x;
+    double dy_global = latest_goal_.pose.position.y - latest_pose_.pose.position.y;
     double distance = sqrt(dx_global * dx_global + dy_global * dy_global);
-
     geometry_msgs::msg::Twist cmd;
 
     // 检查是否到达位置
@@ -171,19 +172,18 @@ private:
     return atan2(siny_cosp, cosy_cosp);
   }
 
-  // 参数
-  double Kp_linear_;
-  double Kp_angular_;
+  // 常规参数
+  double Kp_linear_, Kp_angular_;
   double position_threshold_;
   double angle_threshold_;
   double rotation_first_threshold_;
 
   // 状态
-  bool has_goal_;
-  bool has_target_yaw_;
-  bool rotating_first_; // 标记是否在"先转向"阶段
+  bool has_goal_ = false;
+  bool has_target_yaw_ = false;
+  bool rotating_first_ = false; // 标记是否在"先转向"阶段
 
-  // 数据
+  // 目标点信息
   geometry_msgs::msg::PoseStamped latest_goal_;
   geometry_msgs::msg::PoseStamped latest_pose_;
   double latest_yaw_ = 0.0;

@@ -1,3 +1,14 @@
+/*
+ * 功能:
+ * 订阅里程计数据（实机或仿真），处理后发布雷达位姿信息
+ * 兼容PointLIO里程计消息格式
+ * 发布消息类型: ros2_tools::msg::LidarPose
+ * 订阅消息类型: nav_msgs::msg::Odometry
+ * 配置参数:
+ * - use_simulation (bool): 是否使用仿真里程计，默认true
+ * - simulation_odom_topic (string): 仿真里程计话题，默认"/absolute_pose"
+ * - real_robot_odom_topic (string): 实机里程计话题，默认"/aft_mapped_to_init"
+ */
 #include <cmath>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <nav_msgs/msg/odometry.hpp>
@@ -10,53 +21,42 @@
 class LidarDataNode : public rclcpp::Node {
 public:
     LidarDataNode() : Node("lidar_data_node") {
-        // Declare parameters for mode selection
+        // 启动参数配置
         this->declare_parameter<bool>("use_simulation", true);
         this->declare_parameter<std::string>("simulation_odom_topic", "/absolute_pose");
         this->declare_parameter<std::string>("real_robot_odom_topic", "/aft_mapped_to_init");
-        
-        // Get parameters
         using_gazebo_ = this->get_parameter("use_simulation").as_bool();
         std::string sim_topic = this->get_parameter("simulation_odom_topic").as_string();
         std::string real_topic = this->get_parameter("real_robot_odom_topic").as_string();
         
-        rclcpp::QoS qos_profile = rclcpp::QoS(rclcpp::KeepLast(10)).best_effort();
-        
-        // LidarPose publisher
-        lidar_pub = this->create_publisher<ros2_tools::msg::LidarPose>("lidar_data", 10);
-        RCLCPP_INFO(this->get_logger(), "lidar_data publisher created");
+        // 设置QoS，某些情况下
+        //rclcpp::QoS qos_profile = rclcpp::QoS(rclcpp::KeepLast(10)).best_effort();
 
-        // Subscribe to PointLIO odometry (real robot mode)
+        // 雷达数据发布
+        lidar_pub = this->create_publisher<ros2_tools::msg::LidarPose>("lidar_data", 10);
+        RCLCPP_INFO(this->get_logger(), "创建发布 lidar_data");
+
+        // 订阅 PointLIO 里程计（实机模式）
         odom_sub = this->create_subscription<nav_msgs::msg::Odometry>(
             real_topic, 10, 
             std::bind(&LidarDataNode::odomCallback, this, std::placeholders::_1));
-        RCLCPP_INFO(this->get_logger(), "Real robot odometry subscription: %s", real_topic.c_str());
+        RCLCPP_INFO(this->get_logger(), "创建实机odom订阅: %s", real_topic.c_str());
 
-        // Subscribe to Gazebo odometry (simulation mode)
+        // 订阅仿真里程计（仿真模式）
         local_position_sub = this->create_subscription<nav_msgs::msg::Odometry>(
             sim_topic, 10, 
-            std::bind(&LidarDataNode::localPositionCallback, this, std::placeholders::_1));
-        RCLCPP_INFO(this->get_logger(), "Simulation odometry subscription: %s", sim_topic.c_str());
-        
-        RCLCPP_INFO(this->get_logger(), "LidarDataNode initialized in %s mode", 
-            using_gazebo_ ? "SIMULATION" : "REAL ROBOT");
+            std::bind(&LidarDataNode::odomCallback, this, std::placeholders::_1));
+        RCLCPP_INFO(this->get_logger(), "创建仿真odom订阅: %s", sim_topic.c_str());
     }
 
-    // Real robot lidar odometry callback
+    // 兼容版odom回调
     void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg) {
-        if (!using_gazebo_)
-            msgDispose(msg->pose.pose); // Real robot mode - process lidar data
+        msgDispose(msg->pose.pose);
     }
 
-    // Simulation odometry callback
-    void localPositionCallback(const nav_msgs::msg::Odometry::SharedPtr msg) {
-        if (using_gazebo_)
-            msgDispose(msg->pose.pose); // Simulation mode - process wheel odometry
-    }
-
-    // Unified message processing function
+    // 处理并发布LidarPose消息
     void msgDispose(const geometry_msgs::msg::Pose &pose) {
-        // Convert quaternion to Euler angles
+        // 提取位置和姿态
         double x = pose.position.x;
         double y = pose.position.y;
         double z = pose.position.z;
@@ -66,12 +66,12 @@ public:
         double roll, pitch, yaw;
         m.getRPY(roll, pitch, yaw);
 
-        // Normalize angles to positive range
+        // 归一化到0~2π
         if (roll < 0) roll += 2 * M_PI;
         if (pitch < 0) pitch += 2 * M_PI;
         if (yaw < 0) yaw += 2 * M_PI;
 
-        // Fill LidarPose message
+        // 填充并发布LidarPose消息
         lidar_pose.x = x;
         lidar_pose.y = y;
         lidar_pose.z = z;
@@ -81,6 +81,11 @@ public:
 
         lidar_pub->publish(lidar_pose);
 
+        log(x, y, z, roll, pitch, yaw); // 低频打印日志
+    }
+
+    // 低频打印当前位姿日志
+    void log(double x, double y, double z, double roll, double pitch, double yaw) {
         static int counter = 0;
         if (++counter >= 50) {
             RCLCPP_INFO(

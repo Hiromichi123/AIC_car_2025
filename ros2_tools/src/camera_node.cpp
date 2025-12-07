@@ -5,13 +5,12 @@
 
 class GroundCameraNode : public rclcpp::Node {
 public:
-  GroundCameraNode() : Node("ground_camera_node") {
-    camera_pub_ =
-        this->create_publisher<sensor_msgs::msg::Image>("/camera/ground", 1);
+  GroundCameraNode() : Node("camera_node") {
+    camera_pub_ = this->create_publisher<sensor_msgs::msg::Image>("/camera", 1);
 
     ground_camera_.open("/dev/ground", cv::CAP_V4L2);
     if (!ground_camera_.isOpened()) {
-      RCLCPP_ERROR(this->get_logger(), "Unable to open camera");
+      RCLCPP_ERROR(this->get_logger(), "无法打开摄像头");
       rclcpp::shutdown();
     }
 
@@ -19,9 +18,7 @@ public:
     ground_camera_.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
     ground_camera_.set(cv::CAP_PROP_FPS, 30);
 
-    timer_ = this->create_wall_timer(
-        std::chrono::milliseconds(33),
-        std::bind(&GroundCameraNode::timer_callback, this));
+    timer_ = this->create_wall_timer(std::chrono::milliseconds(33), std::bind(&GroundCameraNode::timer_callback, this));
   }
 
 private:
@@ -30,7 +27,7 @@ private:
     ground_camera_ >> frame;
 
     if (frame.empty()) {
-      RCLCPP_WARN(this->get_logger(), "Captured empty frame");
+      RCLCPP_WARN(this->get_logger(), "camera空帧！");
       return;
     }
 

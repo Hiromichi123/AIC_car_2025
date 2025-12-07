@@ -1,3 +1,4 @@
+"""简单定时器发布目标点，代替rust版本用作实机测试"""
 import math
 from dataclasses import dataclass
 from typing import List, Sequence
@@ -36,7 +37,7 @@ class SimpleGoalPublisher(Node):
         self.timer = None
 
         if not self.goals:
-            self.get_logger().warning('No valid goal_points provided; node will remain idle.')
+            self.get_logger().warning('未提供有效的goal_points')
             return
 
         self.timer = self.create_timer(self.publish_interval, self._on_timer)
@@ -51,7 +52,7 @@ class SimpleGoalPublisher(Node):
             try:
                 numbers = [float(value) for value in parts]
             except ValueError:
-                self.get_logger().warning(f'Unable to parse goal "{raw}"; skipping.')
+                self.get_logger().warning(f'无法解析目标"{raw}"，跳过。')
                 continue
 
             if len(numbers) == 3:
@@ -62,7 +63,7 @@ class SimpleGoalPublisher(Node):
                 goals.append(GoalPose(x=x, y=y, z=z, yaw=yaw))
             else:
                 self.get_logger().warning(
-                    f'Goal "{raw}" must have 3 (x,y,yaw) or 4 (x,y,z,yaw) values; skipping.'
+                    f'Goal"{raw}"形式不正确，跳过'
                 )
 
         return goals
@@ -82,7 +83,7 @@ class SimpleGoalPublisher(Node):
                 self.current_index = 0
             else:
                 if not initial:
-                    self.get_logger().info('All goals sent; stopping publisher timer.')
+                    self.get_logger().info('所有目标已发布，停止发布。')
                 return False
 
         goal = self.goals[self.current_index]

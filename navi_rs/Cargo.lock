@@ -18,6 +18,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
+name = "aho-corasick"
+version = "1.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ddd31a130427c27518df266943a5308ed92d4b226cc639f5a8f1002816174301"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "anyhow"
 version = "1.0.100"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -186,6 +195,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "bindgen"
+version = "0.70.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f49d8fed880d473ea71efb9bf597651e77201bdd4893efe54c9e5d65ae04ce6f"
+dependencies = [
+ "bitflags",
+ "cexpr",
+ "clang-sys",
+ "itertools",
+ "log",
+ "prettyplease",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "rustc-hash",
+ "shlex",
+ "syn",
+]
+
+[[package]]
 name = "bitflags"
 version = "2.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -206,7 +235,7 @@ dependencies = [
 
 [[package]]
 name = "builtin_interfaces"
-version = "1.2.2"
+version = "1.2.1"
 dependencies = [
  "rosidl_runtime_rs",
 ]
@@ -224,10 +253,30 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d71b6127be86fdcfddb610f7182ac57211d4b18a3e9c82eb2d17662f2227ad6a"
 
 [[package]]
+name = "cexpr"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6fac387a98bb7c37292057cffc56d62ecb629900026402633ae9160df93a8766"
+dependencies = [
+ "nom",
+]
+
+[[package]]
 name = "cfg-if"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2fd1289c04a9ea8cb22300a459a72a385d7c73d3259e2ed7dcb2af674838cfa9"
+
+[[package]]
+name = "clang-sys"
+version = "1.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b023947811758c97c59bf9d1c188fd619ad4718dcaa767947df1cadb14f39f4"
+dependencies = [
+ "glob",
+ "libc",
+ "libloading",
+]
 
 [[package]]
 name = "concurrent-queue"
@@ -243,6 +292,12 @@ name = "crossbeam-utils"
 version = "0.8.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
+
+[[package]]
+name = "either"
+version = "1.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "48c757948c5ede0e46177b7add2e67155f70e33c07fea8284df6576da70b3719"
 
 [[package]]
 name = "errno"
@@ -399,22 +454,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "getrandom"
-version = "0.3.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "899def5c37c4fd7b2664648c28120ecec138e4d395b459e5ca34f9cce2dd77fd"
-dependencies = [
- "cfg-if",
- "libc",
- "r-efi",
- "wasip2",
-]
-
-[[package]]
 name = "gimli"
 version = "0.32.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e629b9b98ef3dd8afe6ca2bd0f89306cec16d43d907889945bc5d6687f2f13c7"
+
+[[package]]
+name = "glob"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280"
 
 [[package]]
 name = "gloo-timers"
@@ -446,6 +495,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "js-sys"
 version = "0.3.81"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -471,6 +529,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "58f929b4d672ea937a23a1ab494143d968337a5f47e56d0815df1e0890ddf174"
 
 [[package]]
+name = "libloading"
+version = "0.8.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d7c4b02199fee7c5d21a5ae7d8cfa79a6ef5bb2fc834d6e9058e89c825efdc55"
+dependencies = [
+ "cfg-if",
+ "windows-link",
+]
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -490,6 +558,12 @@ name = "memchr"
 version = "2.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
+
+[[package]]
+name = "minimal-lexical"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
 
 [[package]]
 name = "miniz_oxide"
@@ -522,6 +596,16 @@ dependencies = [
  "std_msgs",
  "tokio",
  "tokio-test",
+]
+
+[[package]]
+name = "nom"
+version = "7.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d273983c5a657a70a3e8f2a01329822f3b8c8172b73826411a55751e404a0a4a"
+dependencies = [
+ "memchr",
+ "minimal-lexical",
 ]
 
 [[package]]
@@ -583,6 +667,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "prettyplease"
+version = "0.2.37"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "479ca8adacdd7ce8f1fb39ce9ecccbfe93a3f1344b3d0d97f20bc0196208f62b"
+dependencies = [
+ "proc-macro2",
+ "syn",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.101"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -601,26 +695,44 @@ dependencies = [
 ]
 
 [[package]]
-name = "r-efi"
-version = "5.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69cdb34c158ceb288df11e18b4bd39de994f6657d83847bdffdbd7f346754b0f"
-
-[[package]]
 name = "rclrs"
-version = "0.6.0"
+version = "0.4.1"
 dependencies = [
  "async-std",
- "async-stream",
+ "bindgen",
  "cfg-if",
  "futures",
- "futures-lite",
  "rosidl_runtime_rs",
- "rustflags",
- "tokio",
- "tokio-stream",
- "uuid",
 ]
+
+[[package]]
+name = "regex"
+version = "1.12.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "843bc0191f75f3e22651ae5f1e72939ab2f72a4bc30fa80a066bd66edefc24d4"
+dependencies = [
+ "aho-corasick",
+ "memchr",
+ "regex-automata",
+ "regex-syntax",
+]
+
+[[package]]
+name = "regex-automata"
+version = "0.4.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5276caf25ac86c8d810222b3dbb938e512c55c6831a10f3e6ed1c93b84041f1c"
+dependencies = [
+ "aho-corasick",
+ "memchr",
+ "regex-syntax",
+]
+
+[[package]]
+name = "regex-syntax"
+version = "0.8.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a2d987857b319362043e95f5353c0535c1f58eec5336fdfcf626430af7def58"
 
 [[package]]
 name = "ros2_tools"
@@ -631,7 +743,7 @@ dependencies = [
 
 [[package]]
 name = "rosidl_runtime_rs"
-version = "0.5.0"
+version = "0.4.1"
 dependencies = [
  "cfg-if",
 ]
@@ -643,10 +755,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56f7d92ca342cea22a06f2121d944b4fd82af56988c270852495420f961d4ace"
 
 [[package]]
-name = "rustflags"
-version = "0.1.7"
+name = "rustc-hash"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a39e0e9135d7a7208ee80aa4e3e4b88f0f5ad7be92153ed70686c38a03db2e63"
+checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
 
 [[package]]
 name = "rustix"
@@ -666,6 +778,12 @@ name = "rustversion"
 version = "1.0.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b39cdef0fa800fc44525c84ccb54a029961a8215f9619753635a9c0d2538d46d"
+
+[[package]]
+name = "shlex"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
 name = "slab"
@@ -749,17 +867,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f63a545481291138910575129486daeaf8ac54aee4387fe7906919f7830c7d9d"
 
 [[package]]
-name = "uuid"
-version = "1.19.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2e054861b4bd027cd373e18e8d8d8e6548085000e41290d95ce0c373a654b4a"
-dependencies = [
- "getrandom",
- "js-sys",
- "wasm-bindgen",
-]
-
-[[package]]
 name = "value-bag"
 version = "1.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -770,15 +877,6 @@ name = "wasi"
 version = "0.11.1+wasi-snapshot-preview1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ccf3ec651a847eb01de73ccad15eb7d99f80485de043efb2f370cd654f4ea44b"
-
-[[package]]
-name = "wasip2"
-version = "1.0.1+wasi-0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0562428422c63773dad2c345a1882263bbf4d65cf3f42e90921f787ef5ad58e7"
-dependencies = [
- "wit-bindgen",
-]
 
 [[package]]
 name = "wasm-bindgen"
@@ -950,15 +1048,9 @@ version = "0.52.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
 
-[[package]]
-name = "wit-bindgen"
-version = "0.46.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f17a85883d4e6d00e8a97c586de764dabcc06133f7f1d55dce5cdc070ad7fe59"
-
 [[patch.unused]]
 name = "action_msgs"
-version = "1.2.2"
+version = "1.2.1"
 
 [[patch.unused]]
 name = "actionlib_msgs"
@@ -966,7 +1058,15 @@ version = "4.9.0"
 
 [[patch.unused]]
 name = "composition_interfaces"
-version = "1.2.2"
+version = "1.2.1"
+
+[[patch.unused]]
+name = "core_rs"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "cv_tools"
+version = "0.0.0"
 
 [[patch.unused]]
 name = "diagnostic_msgs"
@@ -978,51 +1078,71 @@ version = "0.9.3"
 
 [[patch.unused]]
 name = "examples_logging_demo"
-version = "0.5.0"
+version = "0.1.0"
 
 [[patch.unused]]
 name = "examples_parameter_demo"
-version = "0.5.0"
+version = "0.1.0"
 
 [[patch.unused]]
 name = "examples_rclrs_message_demo"
-version = "0.5.0"
+version = "0.4.1"
 
 [[patch.unused]]
 name = "examples_rclrs_minimal_client_service"
-version = "0.5.0"
+version = "0.4.1"
 
 [[patch.unused]]
 name = "examples_rclrs_minimal_pub_sub"
-version = "0.5.0"
+version = "0.4.1"
 
 [[patch.unused]]
 name = "examples_worker_demo"
-version = "0.5.0"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "geographic_msgs"
+version = "1.0.6"
 
 [[patch.unused]]
 name = "lifecycle_msgs"
-version = "1.2.2"
+version = "1.2.1"
+
+[[patch.unused]]
+name = "mavros_msgs"
+version = "2.9.0"
+
+[[patch.unused]]
+name = "mcv_rs"
+version = "0.1.0"
 
 [[patch.unused]]
 name = "nav_msgs"
 version = "4.9.0"
 
 [[patch.unused]]
+name = "navi_rs"
+version = "0.1.0"
+
+[[patch.unused]]
 name = "rcl_interfaces"
-version = "1.2.2"
+version = "1.2.1"
 
 [[patch.unused]]
 name = "rclrs_example_msgs"
-version = "0.5.0"
+version = "0.4.1"
+
+[[patch.unused]]
+name = "ros2_tools"
+version = "0.0.0"
 
 [[patch.unused]]
 name = "rosgraph_msgs"
-version = "1.2.2"
+version = "1.2.1"
 
 [[patch.unused]]
 name = "rust_pubsub"
-version = "0.5.0"
+version = "0.1.0"
 
 [[patch.unused]]
 name = "sensor_msgs"
@@ -1034,7 +1154,7 @@ version = "4.9.0"
 
 [[patch.unused]]
 name = "statistics_msgs"
-version = "1.2.2"
+version = "1.2.1"
 
 [[patch.unused]]
 name = "std_srvs"
@@ -1046,7 +1166,7 @@ version = "4.9.0"
 
 [[patch.unused]]
 name = "test_msgs"
-version = "1.2.2"
+version = "1.2.1"
 
 [[patch.unused]]
 name = "trajectory_msgs"
@@ -1055,6 +1175,10 @@ version = "4.9.0"
 [[patch.unused]]
 name = "unique_identifier_msgs"
 version = "2.2.1"
+
+[[patch.unused]]
+name = "vision_py"
+version = "0.0.0"
 
 [[patch.unused]]
 name = "visualization_msgs"

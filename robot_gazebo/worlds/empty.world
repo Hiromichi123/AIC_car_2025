@@ -5,8 +5,9 @@
     <!-- global光源 -->
     <include>
       <uri>model://sun</uri>
+      <pose>0 0 0 0.0 -0.785 0.785</pose> <!-- 约等于45°斜射 -->
     </include>
-
+    
     <scene>
       <ambient>1 1 1 1</ambient>   <!-- 环境光亮度 -->
       <background>1 1 1 1</background> <!-- 背景亮度可选 -->

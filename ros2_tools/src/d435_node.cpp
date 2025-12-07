@@ -9,8 +9,7 @@ class D435Node : public rclcpp::Node {
 public:
   D435Node() : Node("d435_node") {
     rgb_pub = this->create_publisher<sensor_msgs::msg::Image>("/d435/rgb", 10);
-    depth_pub =
-        this->create_publisher<sensor_msgs::msg::Image>("/d435/depth", 10);
+    depth_pub = this->create_publisher<sensor_msgs::msg::Image>("/d435/depth", 10);
 
     // 配置RealSense流
     rs2::config cfg;
@@ -24,8 +23,7 @@ public:
     rgb->encoding = sensor_msgs::image_encodings::BGR8;
     depth->encoding = sensor_msgs::image_encodings::TYPE_16UC1;
 
-    timer = this->create_wall_timer(std::chrono::milliseconds(33),
-                                    std::bind(&D435Node::publish_images, this));
+    timer = this->create_wall_timer(std::chrono::milliseconds(33), std::bind(&D435Node::publish_images, this));
   }
 
 private:
@@ -37,7 +35,7 @@ private:
     if (!color_frame || !depth_frame)
       return;
 
-    // 转换OpenCV格式, 转换为ROS2消息, 发布
+    // 转换OpenCV -> ROS2消息, 发布
     cv::Mat color_image(cv::Size(1280, 720), CV_8UC3,
                         (void *)color_frame.get_data(), cv::Mat::AUTO_STEP);
     cv::Mat depth_image(cv::Size(640, 480), CV_16UC1,

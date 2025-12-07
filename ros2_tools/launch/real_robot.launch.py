@@ -20,9 +20,9 @@ def generate_launch_description():
         name='lidar_data_node',
         output='screen',
         parameters=[{
-            'use_simulation': False,
-            'simulation_odom_topic': '/absolute_pose',
-            'real_robot_odom_topic': '/aft_mapped_to_init',
+            'use_simulation': False, # 是否使用仿真模式
+            'simulation_odom_topic': '/absolute_pose', # 仅在仿真中使用
+            'real_robot_odom_topic': '/aft_mapped_to_init', # 实际机器人里使用
         }]
     )
 
