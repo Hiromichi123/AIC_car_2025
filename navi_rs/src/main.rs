@@ -27,7 +27,7 @@ fn main() -> anyhow::Result<()> {
         },
     ];
 
-    navi_node.set_destinations(waypoints, 0.25)?;
+    navi_node.set_destinations(waypoints, 0.10)?;
     loop {
         let mut spin_options = SpinOptions::default();
         spin_options.timeout = Some(Duration::from_millis(100));
@@ -44,9 +44,18 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
-    let yolo_response =
-        navi_node.call_yolo_blocking(&mut executor, Duration::from_secs_f32(2.0))?;
-    println!("yolo: {:?}", yolo_response.message);
+    match navi_node.call_yolo_blocking(&mut executor, Duration::from_secs_f32(2.0)) {
+        Ok(yolo_response) => {
+            println!("yolo: {:?}", yolo_response.message);
+        }
+        Err(err) => {
+            log_info!(
+                "navi_main",
+                "YOLO service unavailable or timed out, continuing without detection: {:?}",
+                err
+            );
+        }
+    }
 
     let waypoints = vec![
         Pos {
@@ -63,7 +72,7 @@ fn main() -> anyhow::Result<()> {
         },
     ];
 
-    navi_node.set_destinations(waypoints, 0.25)?;
+    navi_node.set_destinations(waypoints, 0.10)?;
     loop {
         let mut spin_options = SpinOptions::default();
         spin_options.timeout = Some(Duration::from_millis(100));
@@ -77,15 +86,25 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
-    let ocr_response = navi_node.call_ocr_blocking(&mut executor, Duration::from_secs_f32(2.0))?;
-    println!("ocr: {:?}", ocr_response.message);
+    match navi_node.call_ocr_blocking(&mut executor, Duration::from_secs_f32(2.0)) {
+        Ok(ocr_response) => {
+            println!("ocr: {:?}", ocr_response.message);
+        }
+        Err(err) => {
+            log_info!(
+                "navi_main",
+                "OCR service unavailable or timed out, continuing without detection: {:?}",
+                err
+            );
+        }
+    }
 
     let waypoints = vec![Pos {
         translation: CoordUnit(0.6, 2.8, 0.0),
         rotation: CoordUnit(0.0, 0.0, 1.6),
     }];
 
-    navi_node.set_destinations(waypoints, 0.25)?;
+    navi_node.set_destinations(waypoints, 0.10)?;
     loop {
         let mut spin_options = SpinOptions::default();
         spin_options.timeout = Some(Duration::from_millis(100));
@@ -117,7 +136,7 @@ fn main() -> anyhow::Result<()> {
         },
     ];
 
-    navi_node.set_destinations(waypoints, 0.25)?;
+    navi_node.set_destinations(waypoints, 0.10)?;
     loop {
         let mut spin_options = SpinOptions::default();
         spin_options.timeout = Some(Duration::from_millis(100));
