@@ -33,7 +33,6 @@ ament_export_dependencies(rosidl_default_runtime rosidl_generator_rs) # 导出 R
 
 add_executable(lidar_data_node src/lidar_data_node.cpp)
 add_executable(camera_node src/camera_node.cpp)
-add_executable(d435_node src/d435_node.cpp)
 add_executable(bsp_node src/bsp_node.cpp)
 add_executable(hardware_bridge_node src/hardware_bridge_node.cpp)
 
@@ -45,12 +44,8 @@ rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typ
 target_link_libraries(lidar_data_node ${cpp_typesupport_target})
 target_link_libraries(bsp_node ${cpp_typesupport_target})
 
-target_include_directories(d435_node PRIVATE ${realsense2_INCLUDE_DIRS})
-target_link_libraries(d435_node ${realsense2_LIBRARY})
-
 ament_target_dependencies(lidar_data_node rclcpp geometry_msgs tf2 tf2_geometry_msgs nav_msgs)
 ament_target_dependencies(camera_node rclcpp sensor_msgs OpenCV cv_bridge)
-ament_target_dependencies(d435_node rclcpp sensor_msgs OpenCV cv_bridge realsense2)
 ament_target_dependencies(bsp_node rclcpp geometry_msgs tf2 tf2_geometry_msgs nav_msgs)
 ament_target_dependencies(hardware_bridge_node rclcpp geometry_msgs nav_msgs std_msgs)
 
@@ -62,7 +57,6 @@ if(BUILD_TESTING)
 endif()
 
 install(TARGETS lidar_data_node DESTINATION lib/${PROJECT_NAME})
-install(TARGETS d435_node DESTINATION lib/${PROJECT_NAME})
 install(TARGETS camera_node DESTINATION lib/${PROJECT_NAME})
 install(TARGETS bsp_node DESTINATION lib/${PROJECT_NAME})
 install(TARGETS hardware_bridge_node DESTINATION lib/${PROJECT_NAME})

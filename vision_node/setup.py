@@ -44,7 +44,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            "node = vision_node.node:main"
+            "vision_gazebo = vision_node.vision_gazebo:main",
+            "vision_real = vision_node.vision_real:main"
         ],
     },
 )

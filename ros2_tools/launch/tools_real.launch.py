@@ -49,23 +49,31 @@ def generate_launch_description():
         }]
     )
 
-        # d435 = Node(
-    #     package='realsense2_camera',
-    #     executable='realsense2_camera_node',
-    #     name='camera',
-    #     parameters=[{
-    #         'enable_color': True,
-    #         'enable_depth': True,
-    #         'rgb_camera.color_profile': '848x480x30',
-    #         'depth_module.depth_profile': '848x480x30',
-    #         'enable_infra1': True,
-    #         'enable_infra2': True,
-    #         'enable_sync': True, # 同步深度和彩色图像
-    #         #'aligen_depth.enable': True, # 深度图对齐彩色图
-    #         'rgb_camera.power_line_frequency': 2,
-    #     }],
-    #     output='screen'
-    # )
+# D435相机节点
+    d435_node = Node(
+        package='realsense2_camera',
+        executable='realsense2_camera_node',
+        name='d435',
+        parameters=[{
+            'enable_color': True,
+            'enable_depth': False,
+            'rgb_camera.color_profile': '1920x1080x30',
+            'enable_infra1': False, # 红外
+            'enable_infra2': False,
+            #'enable_sync': True, # 同步深度和彩色图像
+            #'aligen_depth.enable': True, # 深度图对齐彩色图
+            'rgb_camera.power_line_frequency': 1, # 50Hz供电频率
+        }],
+        output='screen'
+    )
+
+    # 单目相机节点
+    camera_node = Node(
+        package='ros2_tools',
+        executable='camera_node',
+        name='camera_node',
+        output='screen',
+    )
 
     return LaunchDescription([
         serial_port_arg,
@@ -73,4 +81,6 @@ def generate_launch_description():
         lidar_data_node,
         bsp_node,
         hardware_bridge_node,
+        d435_node,
+        camera_node,
     ])

@@ -5,20 +5,20 @@ This repository contains ROS2 packages for the AIC 2025 car robot platform, supp
 ## 结构总览
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         Navigation Layer                            │
-│  ┌────────────┐      ┌─────────────┐     ┌──────────────┐           │
-│  │  navi_rs   │────▶│   /goal     │────▶│  bsp_node    │           │
-│  │ (Waypoint  │      │(PoseStamped)│     │ (Position    │           │
-│  │ Navigation)│      └─────────────┘     │  Controller) │           │
-│  └────────────┘                          └──────┬───────┘           │
-│        ▲                                        │                   │
-│        │                                        ▼                   │
-│  ┌─────┴──────┐                          ┌──────────────┐           │
-│  │/lidar_data │                          │  /cmd_vel    │           │
-│  │ (LidarPose)│                          │   (Twist)    │           │
-│  └─────┬──────┘                          └──────┬───────┘           │
-└────────│────────────────────────────────────────│───────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                         Navigation Layer                        │
+│  ┌────────────┐      ┌─────────────┐     ┌──────────────┐       │
+│  │  navi_rs   │────▶│   /goal     │────▶│  bsp_node    │       │
+│  │ (Waypoint  │      │(PoseStamped)│     │ (Position    │       │
+│  │ Navigation)│      └─────────────┘     │  Controller) │       │
+│  └────────────┘                          └──────┬───────┘       │
+│        ▲                                        │               │
+│        │                                        ▼               │
+│  ┌─────┴──────┐                          ┌──────────────┐       │
+│  │/lidar_data │                          │  /cmd_vel    │       │
+│  │ (LidarPose)│                          │   (Twist)    │       │
+│  └─────┬──────┘                          └──────┬───────┘       │
+└────────│────────────────────────────────────────│───────────────┘
          │                                        │
 ┌────────│────────────────────────────────────────│───────────────────┐
 │        │           Middleware Layer             │                   │
@@ -46,6 +46,9 @@ ros2 launch robot_gazebo robot.launch.py
 # 启动工具
 ros2 launch ros2_tools tools_gazebo.launch.py
 
+# 启动视觉节点
+ros2 run vision_node vision_gazebo
+
 # 启动导航
 ros2 run navi_rs navi_rs
 ```
@@ -61,8 +64,17 @@ ros2 launch ros2_tools tools_real.launch.py
 # 运行测试节点
 ros2 run robot_real simple_goal.launch.py
 
+# 启动视觉节点
+ros2 run vision_node vision_real
+
 # 启动导航
 ros2 run navi_rs navi_rs
+```
+
+#### 一键启动所有（实机）
+
+```bash
+ros2 launch robot_real all.launch.py
 ```
 
 ## Serial Protocol

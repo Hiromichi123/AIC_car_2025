@@ -6,17 +6,17 @@
 class GroundCameraNode : public rclcpp::Node {
 public:
   GroundCameraNode() : Node("camera_node") {
-    camera_pub_ = this->create_publisher<sensor_msgs::msg::Image>("/camera", 1);
+    camera_pub_ = this->create_publisher<sensor_msgs::msg::Image>("/camera/video", 1);
 
-    ground_camera_.open("/dev/ground", cv::CAP_V4L2);
-    if (!ground_camera_.isOpened()) {
+    camera.open("/dev/video0", cv::CAP_V4L2);
+    if (!camera.isOpened()) {
       RCLCPP_ERROR(this->get_logger(), "无法打开摄像头");
       rclcpp::shutdown();
     }
 
-    ground_camera_.set(cv::CAP_PROP_FRAME_WIDTH, 640);
-    ground_camera_.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
-    ground_camera_.set(cv::CAP_PROP_FPS, 30);
+    camera.set(cv::CAP_PROP_FRAME_WIDTH, 1920);
+    camera.set(cv::CAP_PROP_FRAME_HEIGHT, 1080);
+    camera.set(cv::CAP_PROP_FPS, 30);
 
     timer_ = this->create_wall_timer(std::chrono::milliseconds(33), std::bind(&GroundCameraNode::timer_callback, this));
   }
@@ -24,7 +24,7 @@ public:
 private:
   void timer_callback() {
     cv::Mat frame;
-    ground_camera_ >> frame;
+    camera >> frame;
 
     if (frame.empty()) {
       RCLCPP_WARN(this->get_logger(), "camera空帧！");
@@ -40,7 +40,7 @@ private:
   }
 
   rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr camera_pub_;
-  cv::VideoCapture ground_camera_;
+  cv::VideoCapture camera;
   rclcpp::TimerBase::SharedPtr timer_;
 };
 
