@@ -6,42 +6,38 @@ import cv2
 import numpy as np
 import os
 import sys
-from ultralytics import YOLO as YOLOModel # type: ignore
+from importlib import import_module
+from ultralytics import YOLO as YOLOModel  # type: ignore
 from PIL import ImageFont, ImageDraw, Image as PILImage
 
 from ros2_tools.srv import YOLO
 from ros2_tools.srv import OCR
 
-# 添加PaddleOCR路径到sys.path - 使用绝对路径
-VISION_NODE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PADDLEOCR_DIR = os.path.join(VISION_NODE_DIR, 'ocr')
-
-# 确保路径存在且添加到 sys.path
-if os.path.exists(PADDLEOCR_DIR):
-    if PADDLEOCR_DIR not in sys.path:
-        sys.path.insert(0, PADDLEOCR_DIR)
-    # 同时添加 tools 目录
-    tools_dir = os.path.join(PADDLEOCR_DIR, 'tools')
-    if tools_dir not in sys.path:
-        sys.path.insert(0, tools_dir)
-else:
-    raise RuntimeError(f"PaddleOCR directory not found: {PADDLEOCR_DIR}")
-
-# 导入PaddleOCR
-try:
-    from paddleocr import PaddleOCR
-except ImportError as e:
-    raise ImportError(f"Failed to import PaddleOCR: {e}\nPaddleOCR directory: {PADDLEOCR_DIR}")
-
-# 导入配置
-from .config import (
-    CURRENT_MODEL, OCR_SAVE_DIR, 
-    YOLO_MODEL_PATH, YOLO_FONT_PATH, YOLO_SAVE_DIR, YOLO_LABELS
-)
+from . import config
 
 class VisionNode(Node):
     def __init__(self):
         super().__init__('vision_node')
+
+        # 允许通过 ROS 参数覆盖资源路径
+        self.declare_parameter('vision_node_src_dir', config.VISION_NODE_SRC_DIR)
+        requested_src_dir = self.get_parameter('vision_node_src_dir').get_parameter_value().string_value
+        try:
+            resolved_src_dir = config.configure_paths(requested_src_dir)
+            self.get_logger().info(f"使用 vision_node 资源目录: {resolved_src_dir}")
+        except ValueError as exc:
+            self.get_logger().warn(f"指定的 vision_node 目录无效，回退到默认值: {exc}")
+            resolved_src_dir = config.VISION_NODE_SRC_DIR
+
+        # 确保 PaddleOCR 依赖路径在 sys.path 中
+        self._ensure_paddleocr_paths(resolved_src_dir)
+
+        # 动态导入 PaddleOCR，确保在路径更新后加载
+        try:
+            paddleocr_module = import_module('paddleocr')
+            self._paddleocr_ctor = paddleocr_module.PaddleOCR
+        except Exception as exc:
+            raise ImportError(f"无法导入 PaddleOCR，请检查目录 {resolved_src_dir}/ocr: {exc}") from exc
         
         # 初始化CvBridge用于ROS图像消息转换
         self.bridge = CvBridge()
@@ -83,9 +79,9 @@ class VisionNode(Node):
         self.srv_ocr = self.create_service(OCR, 'ocr_trigger', self.ocr_callback)
         
         # 初始化YOLO模型 - 使用配置文件
-        self.yolo_model_path = YOLO_MODEL_PATH
-        self.yolo_font_path = YOLO_FONT_PATH
-        self.yolo_save_dir = YOLO_SAVE_DIR
+        self.yolo_model_path = config.YOLO_MODEL_PATH
+        self.yolo_font_path = config.YOLO_FONT_PATH
+        self.yolo_save_dir = config.YOLO_SAVE_DIR
         os.makedirs(self.yolo_save_dir, exist_ok=True)
         
         try:
@@ -96,22 +92,35 @@ class VisionNode(Node):
             self.yolo_model = None
         
         # 自定义YOLO标签 - 使用配置文件
-        self.custom_labels = YOLO_LABELS
+        self.custom_labels = config.YOLO_LABELS
         
         # 初始化PaddleOCR - 使用配置文件中的模型
         try:
-            self.ocr_engine = PaddleOCR(**CURRENT_MODEL, show_log=False)
-            self.get_logger().info(f"PaddleOCR引擎加载成功 - 使用模型:")
-            self.get_logger().info(f"  检测模型: {CURRENT_MODEL['det_model_dir']}")
-            self.get_logger().info(f"  识别模型: {CURRENT_MODEL['rec_model_dir']}")
+            self.ocr_engine = self._paddleocr_ctor(**config.CURRENT_MODEL, show_log=False)
+            self.get_logger().info("PaddleOCR引擎加载成功 - 使用模型:")
+            self.get_logger().info(f"  检测模型: {config.CURRENT_MODEL['det_model_dir']}")
+            self.get_logger().info(f"  识别模型: {config.CURRENT_MODEL['rec_model_dir']}")
         except Exception as e:
             self.get_logger().error(f"PaddleOCR引擎加载失败: {e}")
             self.ocr_engine = None
         
-        self.ocr_save_dir = OCR_SAVE_DIR
+        self.ocr_save_dir = config.OCR_SAVE_DIR
         os.makedirs(self.ocr_save_dir, exist_ok=True)
         
         self.get_logger().info("VisionNode初始化完成")
+
+    def _ensure_paddleocr_paths(self, src_dir: str) -> None:
+        """将 OCR 依赖目录注入 sys.path，便于按需覆盖。"""
+
+        ocr_dir = os.path.join(src_dir, 'ocr')
+        tools_dir = os.path.join(ocr_dir, 'tools')
+
+        for path in (ocr_dir, tools_dir):
+            if os.path.isdir(path) and path not in sys.path:
+                sys.path.insert(0, path)
+
+        if not os.path.isdir(ocr_dir):
+            raise RuntimeError(f"未找到 PaddleOCR 目录: {ocr_dir}")
     
     # Camera1 回调函数
     def camera1_image_callback(self, msg):

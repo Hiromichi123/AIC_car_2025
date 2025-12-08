@@ -1,58 +1,88 @@
-"""
-Vision Node OCR 配置文件
-用于配置OCR模型路径和参数
-"""
+"""Vision node 配置及路径管理。
+默认情况下使用源码目录的绝对路径，同时允许在运行时通过 ROS 参数覆盖。"""
+from __future__ import annotations
 
 import os
+from pathlib import Path
+from typing import Dict, Optional
 
-# 使用绝对路径指向源码目录
-# 无论从哪里运行（源码或install目录），都使用源码目录的资源
-VISION_NODE_SRC_DIR = "/home/dev/ros_ws/rs_ws/src/AIC_car_2025/vision_node"
+# 默认使用当前文件所在包的上级目录（vision_node 根目录）
+_DEFAULT_SRC_DIR = Path(__file__).resolve().parents[1]
 
-# 源码中的资源目录
-OCR_DIR = os.path.join(VISION_NODE_SRC_DIR, "ocr")
-YOLO_DIR = os.path.join(VISION_NODE_SRC_DIR, "yolo")
+# 运行时可覆盖的全局变量（通过 configure_paths 更新）
+VISION_NODE_SRC_DIR: str
+OCR_DIR: str
+YOLO_DIR: str
+GREEN_MODEL: Dict[str, object]
+BLUE_MODEL: Dict[str, object]
+DEFAULT_MODEL: Dict[str, object]
+CURRENT_MODEL: Dict[str, object]
+OCR_SAVE_DIR: str
+YOLO_MODEL_PATH: str
+YOLO_FONT_PATH: str
+YOLO_SAVE_DIR: str
 
-# Green模型配置（自定义训练的本地模型）
-GREEN_MODEL = {
-    "det_model_dir": os.path.join(OCR_DIR, "model", "green", "det", "infer"),
-    "rec_model_dir": os.path.join(OCR_DIR, "model", "green", "rec", "infer"),
-    "rec_char_dict_path": os.path.join(OCR_DIR, "ppocr", "utils", "ppocr_keys_v1.txt"),
-    "use_angle_cls": False,
-    "lang": "ch",
-    "use_gpu": False,
-}
 
-# Blue模型配置（自定义训练的本地模型）
-BLUE_MODEL = {
-    "det_model_dir": os.path.join(OCR_DIR, "model", "blue", "det", "infer"),
-    "rec_model_dir": os.path.join(OCR_DIR, "model", "blue", "rec", "infer"),
-    "rec_char_dict_path": os.path.join(OCR_DIR, "ppocr", "utils", "ppocr_keys_v1.txt"),
-    "use_angle_cls": False,
-    "lang": "ch",
-    "use_gpu": False,
-}
+def _build_ocr_model_config(base_dir: Path, variant: str) -> Dict[str, object]:
+    """构建 OCR 模型配置，variant 取值例如 "green" 或 "blue"."""
 
-# 默认PaddleOCR模型配置（在线下载）
-DEFAULT_MODEL = {
-    "use_angle_cls": True,
-    "lang": "ch",
-    "use_gpu": False,
-    "show_log": False,
-    # 不指定det_model_dir和rec_model_dir，使用默认下载的模型
-}
+    model_root = base_dir / "ocr" / "model" / variant
+    return {
+        "det_model_dir": str(model_root / "det" / "infer"),
+        "rec_model_dir": str(model_root / "rec" / "infer"),
+        "rec_char_dict_path": str(base_dir / "ocr" / "ppocr" / "utils" / "ppocr_keys_v1.txt"),
+        "use_angle_cls": False,
+        "lang": "ch",
+        "use_gpu": False,
+    }
 
-# 当前使用的模型配置
-# 可以在这里切换：GREEN_MODEL 或 DEFAULT_MODEL
-CURRENT_MODEL = BLUE_MODEL
 
-# OCR结果保存目录（保存到源码目录）
-OCR_SAVE_DIR = os.path.join(OCR_DIR, "inference_results")
+def _apply_base_dir(base_dir: Path) -> None:
+    """根据给定目录刷新所有路径配置."""
+    global VISION_NODE_SRC_DIR, OCR_DIR, YOLO_DIR
+    global GREEN_MODEL, BLUE_MODEL, DEFAULT_MODEL, CURRENT_MODEL
+    global OCR_SAVE_DIR, YOLO_MODEL_PATH, YOLO_FONT_PATH, YOLO_SAVE_DIR
 
-# YOLO配置（使用源码目录的绝对路径）
-YOLO_MODEL_PATH = os.path.join(YOLO_DIR, "best2.pt")
-YOLO_FONT_PATH = os.path.join(YOLO_DIR, "NotoSansSC-VariableFont_wght.ttf")
-YOLO_SAVE_DIR = os.path.join(YOLO_DIR, "results")
+    base_dir = base_dir.resolve()
+    VISION_NODE_SRC_DIR = str(base_dir)
+    OCR_DIR = str(base_dir / "ocr")
+    YOLO_DIR = str(base_dir / "yolo")
+
+    # 本地训练模型配置
+    GREEN_MODEL = _build_ocr_model_config(base_dir, "green")
+    BLUE_MODEL = _build_ocr_model_config(base_dir, "blue")
+
+    # 默认在线模型配置，保持可用
+    DEFAULT_MODEL = {
+        "use_angle_cls": True,
+        "lang": "ch",
+        "use_gpu": False,
+        "show_log": False,
+    }
+
+    # 默认选用 BLUE 模型，可按需切换
+    CURRENT_MODEL = BLUE_MODEL
+
+    OCR_SAVE_DIR = str(base_dir / "ocr" / "inference_results")
+    YOLO_MODEL_PATH = str(base_dir / "yolo" / "best2.pt")
+    YOLO_FONT_PATH = str(base_dir / "yolo" / "NotoSansSC-VariableFont_wght.ttf")
+    YOLO_SAVE_DIR = str(base_dir / "yolo" / "results")
+
+
+def configure_paths(src_dir: Optional[str]) -> str:
+    """使用给定源码目录刷新配置，返回解析后的绝对路径。
+    如果传入 None 或空字符串，则继续使用当前配置。
+    """
+    if src_dir:
+        candidate = Path(src_dir).expanduser()
+        if not candidate.exists():
+            raise ValueError(f"指定的 vision_node 源码目录不存在: {candidate}")
+        _apply_base_dir(candidate)
+    return VISION_NODE_SRC_DIR
+
+
+# 初始化默认配置
+_apply_base_dir(_DEFAULT_SRC_DIR)
 
 # 自定义YOLO标签（参考test2_new.py）
 YOLO_LABELS = {
