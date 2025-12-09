@@ -75,6 +75,14 @@ def generate_launch_description():
         output='screen',
     )
 
+    # 舵机控制节点
+    pwm_node = Node(
+        package='ros2_tools',
+        executable='pwm_node',
+        name='pwm_node',
+        output='screen',
+    )
+
     return LaunchDescription([
         serial_port_arg,
         baud_rate_arg,
@@ -83,4 +91,5 @@ def generate_launch_description():
         hardware_bridge_node,
         d435_node,
         camera_node,
+        pwm_node,
     ])

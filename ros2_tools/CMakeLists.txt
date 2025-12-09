@@ -62,5 +62,6 @@ install(TARGETS bsp_node DESTINATION lib/${PROJECT_NAME})
 install(TARGETS hardware_bridge_node DESTINATION lib/${PROJECT_NAME})
 install(DIRECTORY msg DESTINATION share/${PROJECT_NAME})
 install(DIRECTORY launch DESTINATION share/${PROJECT_NAME}/)
+install(PROGRAMS src/pwm.py DESTINATION lib/${PROJECT_NAME} RENAME pwm_node)
 
 ament_package()
