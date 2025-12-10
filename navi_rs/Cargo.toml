@@ -6,9 +6,9 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.100"
 tokio = { version = "1.47.1", features = ["sync", "macros", "rt-multi-thread"] }
-rclrs = "*"
-std_msgs = "*"
-geometry_msgs = "*"
+rclrs = {path = "/home/jetson/utils/ros2_rust/install/rclrs/share/rclrs/rust"}
+std_msgs =  { path = "/home/jetson/utils/ros2_rust/install/std_msgs/share/std_msgs/rust" }
+geometry_msgs = { path = "/home/jetson/utils/ros2_rust/install/geometry_msgs/share/geometry_msgs/rust" }
 ros2_tools = { path = "../install/ros2_tools/share/ros2_tools/rust" }
 
 [dev-dependencies]

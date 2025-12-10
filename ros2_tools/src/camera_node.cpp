@@ -8,7 +8,7 @@ public:
   GroundCameraNode() : Node("camera_node") {
     camera_pub_ = this->create_publisher<sensor_msgs::msg::Image>("/camera/video", 1);
 
-    camera.open("/dev/video0", cv::CAP_V4L2);
+    camera.open("/dev/camera1", cv::CAP_V4L2);
     if (!camera.isOpened()) {
       RCLCPP_ERROR(this->get_logger(), "无法打开摄像头");
       rclcpp::shutdown();

@@ -10,7 +10,6 @@ def generate_launch_description():
     # 建图
     slam_launch = os.path.join(
         get_package_share_directory('robot_real'),
-        'launch',
         'slam.launch.py'
     )
 

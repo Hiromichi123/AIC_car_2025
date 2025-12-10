@@ -14,7 +14,7 @@ class PositionController : public rclcpp::Node {
 public:
   PositionController() : Node("bsp_node"),
         Kp_linear_(1.5), Kp_angular_(3.0),
-        position_threshold_(0.05),     // 5cm 认为到达
+        position_threshold_(0.00),     // 5cm 认为到达
         angle_threshold_(0.03),        // ~1.7° 认为朝向正确
         rotation_first_threshold_(0.2) // 角度误差 > 11° 时先转向
   {

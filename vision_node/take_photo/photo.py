@@ -7,7 +7,7 @@ import time
 
 SAVE_DIR = "dataset_images"     # Folder to save captured images
 FRAME_INTERVAL = 1              # Save one image every N frames
-CAMERA_ID = 4                   # Camera ID (0 for USB camera usually)
+CAMERA_ID = 7                   # Camera ID (0 for USB camera usually)
 
 # -------------------------------------------------
 

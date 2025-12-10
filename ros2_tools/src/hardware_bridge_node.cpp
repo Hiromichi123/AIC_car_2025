@@ -77,8 +77,14 @@ public:
         // cmd_vel定时器 50hz
         send_timer_ = this->create_wall_timer(std::chrono::milliseconds(20), std::bind(&HardwareBridgeNode::sendCommandTimer, this));
 
-        // 看门狗定时器 - 如果500ms内未收到cmd_vel，则停止电机
-        // watchdog_timer_ = this->create_wall_timer(std::chrono::milliseconds(100), std::bind(&HardwareBridgeNode::watchdogCallback, this));
+        float timeout = 5;
+        // 看门狗定时器 - 如果5s内未收到cmd_vel，则停止电机
+        watchdog_timer_ = this->create_wall_timer(
+            std::chrono::milliseconds(100),
+            [this, timeout]() {
+                watchdogCallback(timeout);
+            }
+        );
 
         RCLCPP_INFO(this->get_logger(), "硬件桥接节点已启动");
         RCLCPP_INFO(this->get_logger(), "串口: %s", enable_serial_ ? "已启用" : "已禁用");
@@ -200,16 +206,16 @@ private:
         current_omega_ = prev_omega;
     }
 
-    // 检查是否长时间未收到命令（2hz）未启用
-    // void watchdogCallback() {
-    //     auto elapsed = this->now() - last_cmd_time_;
-    //     if (elapsed.seconds() > 0.5 && cmd_received_) {
-    //         current_vx_ = 0.0;
-    //         current_vy_ = 0.0;
-    //         current_omega_ = 0.0;
-    //         RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000, "长时间未收到 cmd_vel（%.1f 秒），电机已停止", elapsed.seconds());
-    //     }
-    // }
+    // 检查是否长时间未收到命令未启用
+    void watchdogCallback(float timeout = 0.5) {
+        auto elapsed = this->now() - last_cmd_time_;
+        if (elapsed.seconds() > timeout && cmd_received_) {
+            current_vx_ = 0.0;
+            current_vy_ = 0.0;
+            current_omega_ = 0.0;
+            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000, "长时间未收到 cmd_vel（%.1f 秒），电机已停止", elapsed.seconds());
+        }
+    }
 
     // 转换为协议值
     int16_t toProtocolValue(double value) const {

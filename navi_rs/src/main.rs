@@ -14,17 +14,9 @@ fn main() -> anyhow::Result<()> {
 
     let waypoints = vec![
         Pos {
-            translation: CoordUnit(3.3, 0.0, 0.0),
+            translation: CoordUnit(1.2, 0.0, 0.0),
             rotation: CoordUnit(0.0, 0.0, 0.0),
-        },
-        Pos {
-            translation: CoordUnit(3.3, 1.3, 0.0),
-            rotation: CoordUnit(0.0, 0.0, 0.0),
-        },
-        Pos {
-            translation: CoordUnit(2.4, 1.3, 0.0),
-            rotation: CoordUnit(0.0, 0.0, 0.0),
-        },
+        }
     ];
 
     navi_node.set_destinations(waypoints, 0.10)?;
@@ -59,16 +51,71 @@ fn main() -> anyhow::Result<()> {
 
     let waypoints = vec![
         Pos {
-            translation: CoordUnit(1.7, 1.3, 0.0),
+            translation: CoordUnit(3.3, 0.0, 0.0),
             rotation: CoordUnit(0.0, 0.0, 0.0),
         },
         Pos {
-            translation: CoordUnit(1.7, 3.3, 0.0),
+            translation: CoordUnit(3.3, 1.2, 0.0),
             rotation: CoordUnit(0.0, 0.0, 0.0),
         },
         Pos {
-            translation: CoordUnit(0.6, 3.1, 0.0),
-            rotation: CoordUnit(0.0, 0.0, 1.57),
+            translation: CoordUnit(1.8, 1.2, 0.0),
+            rotation: CoordUnit(0.0, 0.0, 0.0),
+        },
+    ];
+
+    navi_node.set_destinations(waypoints, 0.10)?;
+    loop {
+        let mut spin_options = SpinOptions::default();
+        spin_options.timeout = Some(Duration::from_millis(100));
+        spin_options.only_next_available_work = true;
+        spin_options.until_promise_resolved = None;
+        executor.spin(spin_options);
+
+        if navi_node.is_arrived() {
+            log_info!("navi_main", "All waypoints reached! Stopping navigation...");
+            break;
+        }
+    }
+
+    let waypoints = vec![
+        Pos {
+            translation: CoordUnit(1.8, 2.0, 0.0),
+            rotation: CoordUnit(0.0, 0.0, 0.0),
+        },
+    ];
+
+    navi_node.set_destinations(waypoints, 0.10)?;
+    loop {
+        let mut spin_options = SpinOptions::default();
+        spin_options.timeout = Some(Duration::from_millis(100));
+        spin_options.only_next_available_work = true;
+        spin_options.until_promise_resolved = None;
+        executor.spin(spin_options);
+
+        if navi_node.is_arrived() {
+            log_info!("navi_main", "All waypoints reached! Stopping navigation...");
+            break;
+        }
+    }
+
+    match navi_node.call_yolo_blocking(&mut executor, Duration::from_secs_f32(2.0)) {
+        Ok(yolo_response) => {
+            println!("yolo: {:?}", yolo_response.message);
+        }
+        Err(err) => {
+            log_info!(
+                "navi_main",
+                "YOLO service unavailable or timed out, continuing without detection: {:?}",
+                err
+            );
+        }
+    }
+
+    let waypoints = vec![
+        Pos {
+            translation: CoordUnit(1.8, 3.4, 0.0),
+            rotation: CoordUnit(0.0, 0.0, 0.0),
         },
     ];
 
@@ -99,9 +146,10 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
-    let waypoints = vec![Pos {
-        translation: CoordUnit(0.6, 2.8, 0.0),
-        rotation: CoordUnit(0.0, 0.0, 1.6),
+    let waypoints = vec![
+        Pos {
+        translation: CoordUnit(0.6, 3.4, 0.0),
+        rotation: CoordUnit(0.0, 0.0, 0.0),
     }];
 
     navi_node.set_destinations(waypoints, 0.10)?;
