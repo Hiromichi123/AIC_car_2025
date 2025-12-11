@@ -1,5 +1,6 @@
 """Vision node 配置及路径管理。
 默认情况下使用源码目录的绝对路径，同时允许在运行时通过 ROS 参数覆盖。"""
+
 from __future__ import annotations
 
 import os
@@ -31,7 +32,9 @@ def _build_ocr_model_config(base_dir: Path, variant: str) -> Dict[str, object]:
     return {
         "det_model_dir": str(model_root / "det" / "infer"),
         "rec_model_dir": str(model_root / "rec" / "infer"),
-        "rec_char_dict_path": str(base_dir / "ocr" / "ppocr" / "utils" / "ppocr_keys_v1.txt"),
+        "rec_char_dict_path": str(
+            base_dir / "ocr" / "ppocr" / "utils" / "ppocr_keys_v1.txt"
+        ),
         "use_angle_cls": False,
         "lang": "ch",
         "use_gpu": False,
@@ -95,7 +98,9 @@ def _apply_base_dir(base_dir: Path) -> None:
                     YOLO_MODEL_PATH = str(share_yolo_dir / "best2.pt")
                 elif YOLO_MODELS:
                     YOLO_MODEL_PATH = next(iter(YOLO_MODELS.values()))
-                YOLO_FONT_PATH = str(share_yolo_dir / "NotoSansSC-VariableFont_wght.ttf")
+                YOLO_FONT_PATH = str(
+                    share_yolo_dir / "NotoSansSC-VariableFont_wght.ttf"
+                )
                 YOLO_DIR = str(share_yolo_dir)
                 YOLO_SAVE_DIR = str(share_yolo_dir / "results")
         except Exception:
@@ -114,18 +119,53 @@ def configure_paths(src_dir: Optional[str]) -> str:
     return VISION_NODE_SRC_DIR
 
 
+# 自定义YOLO标签 - 按模型分类
+# 每个模型有自己的标签映射和颜色配置
+YOLO_LABELS = {
+    "people_best": {
+        "labels": {
+            0: "社区内人员",
+            1: "非社区人员",
+        },
+        "colors": {
+            0: (0, 255, 0),  # 绿色 - 社区内人员
+            1: (255, 0, 0),  # 蓝色 - 非社区人员
+        },
+    },
+    "traffic_light": {
+        "labels": {
+            0: "红灯",
+            1: "黄灯",
+            2: "绿灯",
+        },
+        "colors": {
+            0: (0, 0, 255),  # 红色 - 红灯
+            1: (0, 255, 255),  # 黄色 - 黄灯
+            2: (0, 255, 0),  # 绿色 - 绿灯
+        },
+    },
+    "rubbish_bin_best": {
+        "labels": {
+            0: "垃圾桶",
+        },
+        "colors": {
+            0: (128, 128, 128),  # 灰色
+        },
+    },
+    "e_bike": {
+        "labels": {
+            0: "电动车",
+        },
+        "colors": {
+            0: (255, 165, 0),  # 橙色
+        },
+    },
+    # 默认标签配置（用于未知模型）
+    "default": {"labels": {}, "colors": {}},
+}
+
 # 初始化默认配置
 _apply_base_dir(_DEFAULT_SRC_DIR)
-
-# 自定义YOLO标签
-# 0/1 兼容 people_best 模型；2/3 预留交通灯/其他任务；未知类别回退为 "未知类别"
-YOLO_LABELS = {
-    0: "社区内人员",
-    1: "非社区人员",
-    2: "红灯",
-    3: "绿灯",
-    4: "黄灯",
-}
 
 # 调试信息：打印路径
 if __name__ == "__main__":
@@ -141,17 +181,23 @@ if __name__ == "__main__":
     print(f"\nYOLO模型: {YOLO_MODEL_PATH}")
     print(f"YOLO字体: {YOLO_FONT_PATH}")
     print("=" * 60)
-    
+
     # 检查文件是否存在
     print("\n文件存在性检查:")
     files_to_check = [
-        ("OCR检测模型", os.path.join(GREEN_MODEL['det_model_dir'], "inference.pdmodel")),
-        ("OCR识别模型", os.path.join(GREEN_MODEL['rec_model_dir'], "inference.pdmodel")),
-        ("字符字典", GREEN_MODEL['rec_char_dict_path']),
+        (
+            "OCR检测模型",
+            os.path.join(GREEN_MODEL["det_model_dir"], "inference.pdmodel"),
+        ),
+        (
+            "OCR识别模型",
+            os.path.join(GREEN_MODEL["rec_model_dir"], "inference.pdmodel"),
+        ),
+        ("字符字典", GREEN_MODEL["rec_char_dict_path"]),
         ("YOLO模型", YOLO_MODEL_PATH),
         ("YOLO字体", YOLO_FONT_PATH),
     ]
-    
+
     for name, path in files_to_check:
         exists = "✓" if os.path.exists(path) else "✗"
         print(f"{exists} {name:>8}: {path}")
