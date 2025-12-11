@@ -47,6 +47,6 @@ def generate_launch_description():
     return LaunchDescription([
         slam,
         ros2_tools,
-        TimerAction(period=10.0, actions=[vision_node]),
-        TimerAction(period=10.0, actions=[navi_node]),
+        vision_node,
+        TimerAction(period=5.0, actions=[navi_node]),
     ])

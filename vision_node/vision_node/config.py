@@ -21,6 +21,7 @@ OCR_SAVE_DIR: str
 YOLO_MODEL_PATH: str
 YOLO_FONT_PATH: str
 YOLO_SAVE_DIR: str
+YOLO_MODELS: Dict[str, str]
 
 
 def _build_ocr_model_config(base_dir: Path, variant: str) -> Dict[str, object]:
@@ -41,7 +42,7 @@ def _apply_base_dir(base_dir: Path) -> None:
     """根据给定目录刷新所有路径配置."""
     global VISION_NODE_SRC_DIR, OCR_DIR, YOLO_DIR
     global GREEN_MODEL, BLUE_MODEL, DEFAULT_MODEL, CURRENT_MODEL
-    global OCR_SAVE_DIR, YOLO_MODEL_PATH, YOLO_FONT_PATH, YOLO_SAVE_DIR
+    global OCR_SAVE_DIR, YOLO_MODEL_PATH, YOLO_FONT_PATH, YOLO_SAVE_DIR, YOLO_MODELS
 
     base_dir = base_dir.resolve()
     VISION_NODE_SRC_DIR = str(base_dir)
@@ -64,9 +65,41 @@ def _apply_base_dir(base_dir: Path) -> None:
     CURRENT_MODEL = BLUE_MODEL
 
     OCR_SAVE_DIR = str(base_dir / "ocr" / "inference_results")
-    YOLO_MODEL_PATH = str(base_dir / "yolo" / "best2.pt")
     YOLO_FONT_PATH = str(base_dir / "yolo" / "NotoSansSC-VariableFont_wght.ttf")
     YOLO_SAVE_DIR = str(base_dir / "yolo" / "results")
+
+    # 枚举 yolo 目录下的模型，键为不带扩展名的文件名，值为绝对路径
+    YOLO_MODELS = {}
+    for pt_file in (base_dir / "yolo").glob("*.pt"):
+        YOLO_MODELS[pt_file.stem] = str(pt_file)
+
+    # 默认模型路径：优先 best2.pt，否则取第一个可用模型
+    default_model = base_dir / "yolo" / "best2.pt"
+    if default_model.exists():
+        YOLO_MODEL_PATH = str(default_model)
+    elif YOLO_MODELS:
+        YOLO_MODEL_PATH = next(iter(YOLO_MODELS.values()))
+    else:
+        YOLO_MODEL_PATH = str(default_model)
+
+    # 如果当前目录没有模型，尝试从安装前缀的 share/vision_node/yolo 回退加载
+    if not YOLO_MODELS:
+        try:
+            from ament_index_python.packages import get_package_share_directory
+
+            share_dir = Path(get_package_share_directory("vision_node"))
+            share_yolo_dir = share_dir / "yolo"
+            if share_yolo_dir.exists():
+                YOLO_MODELS = {pt.stem: str(pt) for pt in share_yolo_dir.glob("*.pt")}
+                if (share_yolo_dir / "best2.pt").exists():
+                    YOLO_MODEL_PATH = str(share_yolo_dir / "best2.pt")
+                elif YOLO_MODELS:
+                    YOLO_MODEL_PATH = next(iter(YOLO_MODELS.values()))
+                YOLO_FONT_PATH = str(share_yolo_dir / "NotoSansSC-VariableFont_wght.ttf")
+                YOLO_DIR = str(share_yolo_dir)
+                YOLO_SAVE_DIR = str(share_yolo_dir / "results")
+        except Exception:
+            pass
 
 
 def configure_paths(src_dir: Optional[str]) -> str:
@@ -84,10 +117,14 @@ def configure_paths(src_dir: Optional[str]) -> str:
 # 初始化默认配置
 _apply_base_dir(_DEFAULT_SRC_DIR)
 
-# 自定义YOLO标签（参考test2_new.py）
+# 自定义YOLO标签
+# 0/1 兼容 people_best 模型；2/3 预留交通灯/其他任务；未知类别回退为 "未知类别"
 YOLO_LABELS = {
     0: "社区内人员",
-    1: "非社区人员"
+    1: "非社区人员",
+    2: "红灯",
+    3: "绿灯",
+    4: "黄灯",
 }
 
 # 调试信息：打印路径

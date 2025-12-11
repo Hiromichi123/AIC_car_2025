@@ -1,11 +1,13 @@
-import rclpy
-from rclpy.node import Node
-from sensor_msgs.msg import Image, CameraInfo
-from cv_bridge import CvBridge
 import cv2
-import numpy as np
 import os
 import sys
+import numpy as np
+import rclpy
+import time
+from rclpy.node import Node
+from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy, QoSPresetProfiles
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge
 from importlib import import_module
 from ultralytics import YOLO as YOLOModel  # type: ignore
 from PIL import ImageFont, ImageDraw, Image as PILImage
@@ -46,42 +48,33 @@ class VisionNode(Node):
         self.camera1_image = None # 单目旋转相机
         self.camera2_image = None # 双目固定相机
         
+        # 允许自定义相机话题
+        camera1_topic = self.declare_parameter('camera1_topic', 'camera/video').value
+        camera2_topic = self.declare_parameter('camera2_topic', 'camera/d435/color/image_raw').value
+
         # 创建订阅者
-        qos_profile = QoSProfile(
-        reliability=ReliabilityPolicy.RELIABLE,
-            history=HistoryPolicy.KEEP_LAST,
-            depth=1
+        # 相机话题通常使用 sensor data QoS，避免可靠模式导致丢帧阻塞
+        qos_profile = QoSPresetProfiles.SENSOR_DATA.value
+        # 普通相机
+        self.camera1_image_sub = self.create_subscription(Image,
+            camera1_topic, self.camera1_image_callback, qos_profile
         )
-        self.camera1_image_sub = self.create_subscription(
-            Image,
-            'camera/video',
-            self.camera1_image_callback,
-            qos_profile
+        # 深度相机
+        self.camera2_image_sub = self.create_subscription(Image,
+            camera2_topic, self.camera2_image_callback, qos_profile
         )
-        self.camera2_image_sub = self.create_subscription(
-            Image,
-            'camera/d435/color/image_raw',
-            self.camera2_image_callback,
-            qos_profile
-        )
-        
-        # 创建服务
         self.srv_yolo = self.create_service(YOLO, 'yolo_trigger', self.yolo_callback)
         self.srv_ocr = self.create_service(OCR, 'ocr_trigger', self.ocr_callback)
         
-        # 初始化YOLO模型 - 使用配置文件
-        self.yolo_model_path = config.YOLO_MODEL_PATH
+        # 初始化YOLO模型 - 支持多模型
+        self.yolo_model_path_default = config.YOLO_MODEL_PATH
         self.yolo_font_path = config.YOLO_FONT_PATH
         self.yolo_save_dir = config.YOLO_SAVE_DIR
         os.makedirs(self.yolo_save_dir, exist_ok=True)
-        
-        try:
-            self.yolo_model = YOLOModel(self.yolo_model_path)
-            self.get_logger().info("YOLO模型加载成功")
-        except Exception as e:
-            self.get_logger().error(f"YOLO模型加载失败: {e}")
-            self.yolo_model = None
-        
+
+        self.yolo_models = {}  # 缓存已加载模型: name -> (model, path)
+        self.yolo_model_paths = config.YOLO_MODELS
+
         # 自定义YOLO标签 - 使用配置文件
         self.custom_labels = config.YOLO_LABELS
         
@@ -102,7 +95,6 @@ class VisionNode(Node):
 
     def _ensure_paddleocr_paths(self, src_dir: str) -> None:
         """将 OCR 依赖目录注入 sys.path，便于按需覆盖。"""
-
         ocr_dir = os.path.join(src_dir, 'ocr')
         tools_dir = os.path.join(ocr_dir, 'tools')
 
@@ -128,87 +120,155 @@ class VisionNode(Node):
             self.get_logger().error(f"Camera2图像转换失败: {e}")
     
     def yolo_callback(self, request, response):
-        """YOLO检测服务回调函数 - 同时处理camera1和camera2"""
-        self.get_logger().info("开始YOLO检测...")
-        
-        if self.yolo_model is None:
+        """YOLO检测服务回调函数 - 支持指定模型与相机"""
+        model_name = request.model.strip()
+        camera_mode = (request.camera or "").strip().lower() or "both"
+        if camera_mode not in ("camera1", "camera2", "both"):
             response.success = False
-            response.message = "YOLO模型未加载"
+            response.message = f"不支持的 camera 参数: {request.camera}"
             return response
-        
-        # 检查两个相机的图像
-        if self.camera1_image is None and self.camera2_image is None:
+
+        model, model_path = self._get_yolo_model(model_name)
+        if model is None:
             response.success = False
-            response.message = "Camera1和Camera2图像均未接收"
+            response.message = f"YOLO模型未加载: {model_name or 'default'}"
             return response
-        
+
         try:
-            import time
-            timestamp = time.strftime("%Y%m%d-%H%M%S")
+            def process_cam(name: str, frame, ts: str, suppress_empty_warn: bool = False, save_result: bool = True, return_frame: bool = False):
+                self.get_logger().info(f"处理{name}图像... 使用模型: {model_path}")
+                return self._process_yolo_image(
+                    frame.copy(), f"{name}_{ts}", name, model,
+                    suppress_empty_warn=suppress_empty_warn, save_result=save_result, return_frame=return_frame
+                )
+
+            camera_sources = []
+            if camera_mode in ("camera1", "both"):
+                camera_sources.append(("Camera1", self.camera1_image))
+            if camera_mode in ("camera2", "both"):
+                camera_sources.append(("Camera2", self.camera2_image))
+
+            # 特殊逻辑：交通灯模型等待“绿灯”出现
+            if model_name == "traffic_light":
+                max_wait = self.declare_parameter("traffic_light_max_wait", 20.0).value
+                poll_interval = self.declare_parameter("traffic_light_poll_interval", 0.5).value
+                deadline = time.time() + max_wait
+
+                last_frame = None
+                last_prefix = None
+                last_camera_name = None
+
+                while time.time() < deadline:
+                    ts = time.strftime("%Y%m%d-%H%M%S")
+                    all_detection_results = []
+                    processed = False
+                    missing = []
+
+                    for label, image in camera_sources:
+                        if image is None:
+                            missing.append(label)
+                            continue
+                        processed = True
+                        det_results, frame_processed = process_cam(
+                            label, image, ts, suppress_empty_warn=True, save_result=True, return_frame=True
+                        )
+                        all_detection_results.extend(det_results)
+                        last_frame = frame_processed
+                        last_prefix = f"{label}_{ts}"
+                        last_camera_name = label
+
+                    if not processed:
+                        response.success = False
+                        response.message = (
+                            f"{'、'.join(missing)}图像未接收" if missing else "未接收到可用图像"
+                        )
+
+                    # 判断是否出现绿灯（label包含“绿灯”或类别id==3已在 _process_yolo_image 显示为绿灯）
+                    green_hits = [msg for msg in all_detection_results if "绿灯" in msg]
+                    if green_hits:
+                        if last_frame is not None and last_prefix is not None and last_camera_name is not None:
+                            response.success = True 
+                            response.message = f"检测到绿灯: {'; '.join(green_hits)}"
+                            return response
+
+                    time.sleep(poll_interval)
+
+                response.success = False
+                response.message = "等待绿灯超时"
+                return response
+
+            # 默认一次性检测
+            ts = time.strftime("%Y%m%d-%H%M%S")
             all_detection_results = []
-            
-            # 处理Camera1
-            if self.camera1_image is not None:
-                self.get_logger().info("处理Camera1图像...")
-                camera1_results = self._process_yolo_image(
-                    self.camera1_image.copy(), 
-                    f"camera1_{timestamp}",
-                    "Camera1"
-                )
-                all_detection_results.extend(camera1_results)
-            else:
-                self.get_logger().warn("Camera1图像未接收，跳过")
-            
-            # 处理Camera2
-            if self.camera2_image is not None:
-                self.get_logger().info("处理Camera2图像...")
-                camera2_results = self._process_yolo_image(
-                    self.camera2_image.copy(), 
-                    f"camera2_{timestamp}",
-                    "Camera2"
-                )
-                all_detection_results.extend(camera2_results)
-            else:
-                self.get_logger().warn("Camera2图像未接收，跳过")
-            
+            processed = False
+            missing = []
+
+            for label, image in camera_sources:
+                if image is None:
+                    missing.append(label)
+                    continue
+                processed = True
+                all_detection_results.extend(process_cam(label, image, ts))
+
+            if not processed:
+                response.success = False
+                if missing:
+                    response.message = f"{'、'.join(missing)}图像未接收"
+                else:
+                    response.message = "未接收到可用图像"
+                return response
+
             response.success = True
             if all_detection_results:
-                response.message = f"YOLO检测完成，共检测到{len(all_detection_results)}个目标。结果: {'; '.join(all_detection_results)}"
+                response.message = (
+                    f"YOLO检测到{len(all_detection_results)}个目标。结果: {'; '.join(all_detection_results)}"
+                )
             else:
-                response.message = "YOLO检测完成，未检测到目标"
-            
+                response.message = "YOLO未检测到目标"
+
         except Exception as e:
-            self.get_logger().error(f"YOLO检测失败: {e}")
             response.success = False
             response.message = f"YOLO检测失败: {str(e)}"
-        
+
         return response
     
-    def _process_yolo_image(self, frame, filename_prefix, camera_name):
-        """处理单张图像的YOLO检测（参考test2_new.py）"""
+    def _process_yolo_image(self, frame, filename_prefix, camera_name, model, suppress_empty_warn: bool = False, save_result: bool = True, return_frame: bool = False):
+        """处理单张图像的YOLO检测"""
         detection_results = []
         
-        # 保存原始图像
-        raw_path = os.path.join(self.yolo_save_dir, f"{filename_prefix}_raw.jpg")
-        cv2.imwrite(raw_path, frame)
-        self.get_logger().info(f"📸 已保存{camera_name}原始图像: {raw_path}")
-        
-        # YOLO检测
-        results = self.yolo_model(frame) # type: ignore
+        time.sleep(0.3)  # 确保图像稳定
+        # YOLO检测，输入尺寸960
+        results = model(frame, imgsz=960)  # type: ignore
+        # 保护：无结果则直接返回
+        if not results or results[0].boxes is None:
+            if not suppress_empty_warn:
+                self.get_logger().warn(f"{camera_name} 未检测到目标，结果为空")
+            return ([], frame) if return_frame else []
+
         boxes = results[0].boxes
+        if len(boxes) == 0:
+            if not suppress_empty_warn:
+                self.get_logger().info(f"{camera_name} 未检测到目标")
+            return ([], frame) if return_frame else []
         
-        # 转换为PIL图像以绘制中文（参考test2_new.py）
+        # 转换为PIL图像以绘制中文
         img_pil = PILImage.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
         draw = ImageDraw.Draw(img_pil)
         
         # 加载字体
         try:
             font = ImageFont.truetype(self.yolo_font_path, 28, encoding="utf-8")
-        except Exception as e:
-            self.get_logger().warn(f"无法加载字体 {self.yolo_font_path}: {e}，使用默认字体")
+        except:
             font = ImageFont.load_default()
         
         # 处理每个检测框
+        color_map = {
+            0: (255, 0, 0),     # 社区/人类类目 1
+            1: (0, 255, 0),     # 社区/人类类目 2
+            2: (0, 0, 255),     # 红灯
+            3: (0, 255, 255),   # 绿灯
+            4: (255, 255, 0),   # 黄灯
+        }
         for box in boxes:
             cls_id = int(box.cls)
             conf = float(box.conf)
@@ -216,10 +276,8 @@ class VisionNode(Node):
             
             x1, y1, x2, y2 = map(int, box.xyxy[0])
             
-            # 根据类别设置颜色（参考test2_new.py）
-            # cls_id == 0: 社区内人员 -> 红色 (255, 0, 0)
-            # cls_id == 1: 非社区人员 -> 绿色 (0, 255, 0)
-            color = (255, 0, 0) if cls_id == 1 else (0, 255, 0)
+            # 根据类别设置颜色
+            color = color_map.get(cls_id, (255, 255, 255))
             
             # 绘制矩形框
             draw.rectangle([x1, y1, x2, y2], outline=color, width=3)
@@ -237,11 +295,43 @@ class VisionNode(Node):
         frame = cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
         
         # 保存检测结果图像
-        result_path = os.path.join(self.yolo_save_dir, f"{filename_prefix}_result.jpg")
-        cv2.imwrite(result_path, frame)
-        self.get_logger().info(f"✅ {camera_name}检测结果已保存到: {result_path}")
+        if save_result:
+            result_path = os.path.join(self.yolo_save_dir, f"{filename_prefix}_result.jpg")
+            cv2.imwrite(result_path, frame)
+            self.get_logger().info(f"✅ {camera_name}检测结果已保存到: {result_path}")
         
+        if return_frame:
+            return detection_results, frame
         return detection_results
+
+    def _get_yolo_model(self, model_name: str):
+        """按需加载或复用 YOLO 模型，返回 (model, path)。"""
+        chosen_path = None
+
+        if model_name:
+            chosen_path = self.yolo_model_paths.get(model_name)
+            if chosen_path is None and os.path.isfile(model_name):
+                chosen_path = model_name
+        else:
+            chosen_path = self.yolo_model_path_default
+
+        if chosen_path is None:
+            self.get_logger().error(f"未找到指定的 YOLO 模型: {model_name}")
+            return None, None
+
+        for _, cached in self.yolo_models.items():
+            if cached[1] == chosen_path:
+                return cached
+
+        try:
+            model = YOLOModel(chosen_path)
+            key = model_name or 'default'
+            self.yolo_models[key] = (model, chosen_path)
+            self.get_logger().info(f"加载 YOLO 模型: {chosen_path}")
+            return model, chosen_path
+        except Exception as exc:
+            self.get_logger().error(f"加载 YOLO 模型失败 {chosen_path}: {exc}")
+            return None, None
     
     def ocr_callback(self, request, response):
         """OCR识别服务回调函数 - 同时处理camera1和camera2"""
@@ -265,36 +355,29 @@ class VisionNode(Node):
             
             # 处理Camera1
             if self.camera1_image is not None:
-                self.get_logger().info("处理Camera1图像OCR...")
                 camera1_results = self._process_ocr_image(
                     self.camera1_image.copy(), 
                     f"camera1_{timestamp}",
                     "Camera1"
                 )
                 all_ocr_results.extend(camera1_results)
-            else:
-                self.get_logger().warn("Camera1图像未接收，跳过")
             
             # 处理Camera2
             if self.camera2_image is not None:
-                self.get_logger().info("处理Camera2图像OCR...")
                 camera2_results = self._process_ocr_image(
                     self.camera2_image.copy(), 
                     f"camera2_{timestamp}",
                     "Camera2"
                 )
                 all_ocr_results.extend(camera2_results)
-            else:
-                self.get_logger().warn("Camera2图像未接收，跳过")
             
             response.success = True
             if all_ocr_results:
-                response.message = f"OCR识别完成，共识别到{len(all_ocr_results)}条文本。结果: {'; '.join(all_ocr_results)}"
+                response.message = f"OCR识别到{len(all_ocr_results)}条文本。结果: {'; '.join(all_ocr_results)}"
             else:
-                response.message = "OCR识别完成，未识别到文本"
+                response.message = "OCR未识别到文本"
             
         except Exception as e:
-            self.get_logger().error(f"OCR识别失败: {e}")
             response.success = False
             response.message = f"OCR识别失败: {str(e)}"
         
@@ -304,11 +387,7 @@ class VisionNode(Node):
         """处理单张图像的OCR识别"""
         ocr_results = []
         
-        # 保存原始图像
-        raw_path = os.path.join(self.ocr_save_dir, f"{filename_prefix}_raw.jpg")
-        cv2.imwrite(raw_path, frame)
-        self.get_logger().info(f"📸 已保存{camera_name}原始图像: {raw_path}")
-        
+        time.sleep(0.3)  # 确保图像稳定
         # OCR识别
         result = self.ocr_engine.ocr(frame, cls=True)
         
@@ -323,7 +402,7 @@ class VisionNode(Node):
         # 保存结果图像
         result_path = os.path.join(self.ocr_save_dir, f"{filename_prefix}_result.jpg")
         cv2.imwrite(result_path, frame)
-        self.get_logger().info(f"✅ {camera_name}OCR结果已保存到: {result_path}")
+        self.get_logger().info(f"✅ {camera_name} OCR结果已保存到: {result_path}")
         
         return ocr_results
 

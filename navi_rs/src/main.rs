@@ -1,9 +1,33 @@
 use rclrs::{log_info, CreateBasicExecutor, SpinOptions};
 use std::{thread::sleep, time::Duration};
 
-use crate::navi::{CoordUnit, Pos};
+use crate::navi::{CoordUnit, Pos, ServoState};
 
 pub mod navi;
+
+macro_rules! spin_tick {
+    ($exec:expr) => {{
+        let mut spin_options = SpinOptions::default();
+        spin_options.timeout = Some(Duration::from_millis(100));
+        spin_options.only_next_available_work = true;
+        spin_options.until_promise_resolved = None;
+        $exec.spin(spin_options);
+    }};
+}
+
+macro_rules! set_and_wait {
+    ($node:expr, $wps:expr, $th:expr, $exec:expr, $log:literal) => {{
+        $node.set_destinations($wps, $th)?;
+        loop {
+            spin_tick!($exec);
+
+            if $node.is_arrived() {
+                log_info!("navi_main", $log);
+                break;
+            }
+        }
+    }};
+}
 
 fn main() -> anyhow::Result<()> {
     let context = rclrs::Context::default_from_env()?;
@@ -12,31 +36,70 @@ fn main() -> anyhow::Result<()> {
     log_info!("navi_main", "starting navigator...");
     let navi_node = navi::NaviSubNode::new(&executor, "navigator", "lidar_data")?;
 
-    let waypoints = vec![
-        Pos {
-            translation: CoordUnit(1.2, 0.0, 0.0),
-            rotation: CoordUnit(0.0, 0.0, 0.0),
+    // 先把舵机复位到中位，避免上电姿态不一致
+    if let Err(err) =
+        navi_node.call_servo_blocking(&mut executor, ServoState::CENTER, Duration::from_secs(1))
+    {
+        log_info!("navi_main", "SERVO center command failed: {:?}", err);
+    }
+
+    let waypoints = vec![Pos {
+        translation: CoordUnit(1.1, 0.0, 0.0),
+        rotation: CoordUnit(0.0, 0.0, 0.0),
+    }];
+
+    set_and_wait!(
+        navi_node,
+        waypoints,
+        0.10,
+        executor,
+        "First Camera point reached! Stopping navigation..."
+    );
+
+    match navi_node.call_yolo_blocking(
+        &mut executor,
+        Some("traffic_light"),
+        Some("camera1"),
+        Duration::from_secs_f32(20.0),
+    ) {
+        Ok(yolo_response) => {
+            println!("yolo: {:?}", yolo_response.message);
         }
-    ];
-
-    navi_node.set_destinations(waypoints, 0.10)?;
-    loop {
-        let mut spin_options = SpinOptions::default();
-        spin_options.timeout = Some(Duration::from_millis(100));
-        spin_options.only_next_available_work = true;
-        spin_options.until_promise_resolved = None;
-        executor.spin(spin_options);
-
-        if navi_node.is_arrived() {
+        Err(err) => {
             log_info!(
                 "navi_main",
-                "First Camera point reached! Stopping navigation..."
+                "YOLO service unavailable or timed out, continuing without detection: {:?}",
+                err
             );
-            break;
         }
     }
 
-    match navi_node.call_yolo_blocking(&mut executor, Duration::from_secs_f32(2.0)) {
+    let waypoints = vec![Pos {
+        translation: CoordUnit(2.6, 0.0, 0.0),
+        rotation: CoordUnit(0.0, 0.0, 0.0),
+    }];
+
+    set_and_wait!(
+        navi_node,
+        waypoints,
+        0.10,
+        executor,
+        "First person reached! Stopping navigation..."
+    );
+
+    // 在完成第一段行程后将舵机拨到左侧尝试观察
+    if let Err(err) =
+        navi_node.call_servo_blocking(&mut executor, ServoState::LEFT, Duration::from_secs(1))
+    {
+        log_info!("navi_main", "SERVO left command failed: {:?}", err);
+    }
+
+    match navi_node.call_yolo_blocking(
+        &mut executor,
+        Some("people_best"),
+        Some("camera1"),
+        Duration::from_secs_f32(2.0),
+    ) {
         Ok(yolo_response) => {
             println!("yolo: {:?}", yolo_response.message);
         }
@@ -51,55 +114,29 @@ fn main() -> anyhow::Result<()> {
 
     let waypoints = vec![
         Pos {
-            translation: CoordUnit(3.3, 0.0, 0.0),
+            translation: CoordUnit(3.35, 0.0, 0.0),
             rotation: CoordUnit(0.0, 0.0, 0.0),
         },
         Pos {
-            translation: CoordUnit(3.3, 1.2, 0.0),
-            rotation: CoordUnit(0.0, 0.0, 0.0),
-        },
-        Pos {
-            translation: CoordUnit(1.8, 1.2, 0.0),
+            translation: CoordUnit(3.35, 0.6, 0.0),
             rotation: CoordUnit(0.0, 0.0, 0.0),
         },
     ];
 
-    navi_node.set_destinations(waypoints, 0.10)?;
-    loop {
-        let mut spin_options = SpinOptions::default();
-        spin_options.timeout = Some(Duration::from_millis(100));
-        spin_options.only_next_available_work = true;
-        spin_options.until_promise_resolved = None;
-        executor.spin(spin_options);
+    set_and_wait!(
+        navi_node,
+        waypoints,
+        0.10,
+        executor,
+        "Second person reached! Stopping navigation..."
+    );
 
-        if navi_node.is_arrived() {
-            log_info!("navi_main", "All waypoints reached! Stopping navigation...");
-            break;
-        }
-    }
-
-    let waypoints = vec![
-        Pos {
-            translation: CoordUnit(1.8, 2.0, 0.0),
-            rotation: CoordUnit(0.0, 0.0, 0.0),
-        },
-    ];
-
-    navi_node.set_destinations(waypoints, 0.10)?;
-    loop {
-        let mut spin_options = SpinOptions::default();
-        spin_options.timeout = Some(Duration::from_millis(100));
-        spin_options.only_next_available_work = true;
-        spin_options.until_promise_resolved = None;
-        executor.spin(spin_options);
-
-        if navi_node.is_arrived() {
-            log_info!("navi_main", "All waypoints reached! Stopping navigation...");
-            break;
-        }
-    }
-
-    match navi_node.call_yolo_blocking(&mut executor, Duration::from_secs_f32(2.0)) {
+    match navi_node.call_yolo_blocking(
+        &mut executor,
+        Some("people_best"),
+        Some("camera2"),
+        Duration::from_secs_f32(2.0),
+    ) {
         Ok(yolo_response) => {
             println!("yolo: {:?}", yolo_response.message);
         }
@@ -114,22 +151,62 @@ fn main() -> anyhow::Result<()> {
 
     let waypoints = vec![
         Pos {
-            translation: CoordUnit(1.8, 3.4, 0.0),
+            translation: CoordUnit(3.35, 1.2, 0.0),
+            rotation: CoordUnit(0.0, 0.0, 0.0),
+        },
+        Pos {
+            translation: CoordUnit(2.5, 1.2, 0.0),
             rotation: CoordUnit(0.0, 0.0, 0.0),
         },
     ];
 
-    navi_node.set_destinations(waypoints, 0.10)?;
-    loop {
-        let mut spin_options = SpinOptions::default();
-        spin_options.timeout = Some(Duration::from_millis(100));
-        spin_options.only_next_available_work = true;
-        spin_options.until_promise_resolved = None;
-        executor.spin(spin_options);
+    set_and_wait!(
+        navi_node,
+        waypoints,
+        0.10,
+        executor,
+        "Third person reached! Stopping navigation..."
+    );
 
-        if navi_node.is_arrived() {
-            log_info!("navi_main", "All waypoints reached! Stopping navigation...");
-            break;
+    match navi_node.call_yolo_blocking(
+        &mut executor,
+        Some("people_best"),
+        Some("camera1"),
+        Duration::from_secs_f32(2.0),
+    ) {
+        Ok(yolo_response) => {
+            println!("yolo: {:?}", yolo_response.message);
+        }
+        Err(err) => {
+            log_info!(
+                "navi_main",
+                "YOLO service unavailable or timed out, continuing without detection: {:?}",
+                err
+            );
+        }
+    }
+
+    if let Err(err) =
+        navi_node.call_servo_blocking(&mut executor, ServoState::RIGHT, Duration::from_secs(1))
+    {
+        log_info!("navi_main", "SERVO left command failed: {:?}", err);
+    }
+
+    match navi_node.call_yolo_blocking(
+        &mut executor,
+        Some("people_best"),
+        Some("camera1"),
+        Duration::from_secs_f32(2.0),
+    ) {
+        Ok(yolo_response) => {
+            println!("yolo: {:?}", yolo_response.message);
+        }
+        Err(err) => {
+            log_info!(
+                "navi_main",
+                "YOLO service unavailable or timed out, continuing without detection: {:?}",
+                err
+            );
         }
     }
 
@@ -148,32 +225,213 @@ fn main() -> anyhow::Result<()> {
 
     let waypoints = vec![
         Pos {
-        translation: CoordUnit(0.6, 3.4, 0.0),
-        rotation: CoordUnit(0.0, 0.0, 0.0),
-    }];
+            translation: CoordUnit(1.8, 1.2, 0.0),
+            rotation: CoordUnit(0.0, 0.0, 0.0),
+        },
+        Pos {
+            translation: CoordUnit(1.8, 1.9, 0.0),
+            rotation: CoordUnit(0.0, 0.0, 0.0),
+        },
+    ];
 
-    navi_node.set_destinations(waypoints, 0.10)?;
-    loop {
-        let mut spin_options = SpinOptions::default();
-        spin_options.timeout = Some(Duration::from_millis(100));
-        spin_options.only_next_available_work = true;
-        spin_options.until_promise_resolved = None;
-        executor.spin(spin_options);
+    set_and_wait!(
+        navi_node,
+        waypoints,
+        0.10,
+        executor,
+        "All waypoints reached! Stopping navigation..."
+    );
 
-        if navi_node.is_arrived() {
-            log_info!("navi_main", "All waypoints reached! Stopping navigation...");
-            break;
+    if let Err(err) =
+        navi_node.call_servo_blocking(&mut executor, ServoState::CENTER, Duration::from_secs(1))
+    {
+        log_info!("navi_main", "SERVO center command failed: {:?}", err);
+    }
+
+    match navi_node.call_yolo_blocking(
+        &mut executor,
+        Some("people_best"),
+        Some("camera1"),
+        Duration::from_secs_f32(2.0),
+    ) {
+        Ok(yolo_response) => {
+            println!("yolo: {:?}", yolo_response.message);
+        }
+        Err(err) => {
+            log_info!(
+                "navi_main",
+                "YOLO service unavailable or timed out, continuing without detection: {:?}",
+                err
+            );
         }
     }
 
-    log_info!("navi_main", "Sleeping for 4 secs.");
-    sleep(std::time::Duration::from_secs_f32(4.0));
+    if let Err(err) =
+        navi_node.call_servo_blocking(&mut executor, ServoState::LEFT, Duration::from_secs(1))
+    {
+        log_info!("navi_main", "SERVO left command failed: {:?}", err);
+    }
+
+    match navi_node.call_yolo_blocking(
+        &mut executor,
+        Some("traffic_light"),
+        Some("camera1"),
+        Duration::from_secs_f32(20.0),
+    ) {
+        Ok(yolo_response) => {
+            println!("yolo: {:?}", yolo_response.message);
+        }
+        Err(err) => {
+            log_info!(
+                "navi_main",
+                "YOLO service unavailable or timed out, continuing without detection: {:?}",
+                err
+            );
+        }
+    }
+
+    let waypoints = vec![Pos {
+        translation: CoordUnit(1.8, 3.4, 0.0),
+        rotation: CoordUnit(0.0, 0.0, 0.0),
+    }];
+
+    set_and_wait!(
+        navi_node,
+        waypoints,
+        0.2,
+        executor,
+        "All waypoints reached! Stopping navigation..."
+    );
+
+    if let Err(err) =
+        navi_node.call_servo_blocking(&mut executor, ServoState::CENTER, Duration::from_secs(1))
+    {
+        log_info!("navi_main", "SERVO left command failed: {:?}", err);
+    }
+
+    match navi_node.call_ocr_blocking(&mut executor, Duration::from_secs_f32(2.0)) {
+        Ok(ocr_response) => {
+            println!("ocr: {:?}", ocr_response.message);
+        }
+        Err(err) => {
+            log_info!(
+                "navi_main",
+                "OCR service unavailable or timed out, continuing without detection: {:?}",
+                err
+            );
+        }
+    }
+
+    // 任务完成后回正舵机
+    if let Err(err) =
+        navi_node.call_servo_blocking(&mut executor, ServoState::CENTER, Duration::from_secs(1))
+    {
+        log_info!("navi_main", "SERVO center command failed: {:?}", err);
+    }
 
     let waypoints = vec![
         Pos {
-            translation: CoordUnit(0.6, 2.8, 0.0),
-            rotation: CoordUnit(0.0, 0.0, 6.28),
+            translation: CoordUnit(0.6, 3.4, 0.0),
+            rotation: CoordUnit(0.0, 0.0, 0.0),
         },
+        Pos {
+            translation: CoordUnit(0.6, 2.5, 0.0),
+            rotation: CoordUnit(0.0, 0.0, 0.0),
+        },
+    ];
+
+    set_and_wait!(
+        navi_node,
+        waypoints,
+        0.10,
+        executor,
+        "First car reached! Stopping navigation..."
+    );
+
+    log_info!("navi_main", "Sleeping for 1 secs.");
+    sleep(std::time::Duration::from_secs_f32(1.0));
+
+    match navi_node.call_yolo_blocking(
+        &mut executor,
+        Some("rubbish_bin_best"),
+        Some("camera1"),
+        Duration::from_secs_f32(2.0),
+    ) {
+        Ok(yolo_response) => {
+            println!("yolo: {:?}", yolo_response.message);
+        }
+        Err(err) => {
+            log_info!(
+                "navi_main",
+                "YOLO service unavailable or timed out, continuing without detection: {:?}",
+                err
+            );
+        }
+    }
+
+    let waypoints = vec![Pos {
+        translation: CoordUnit(0.6, 1.5, 0.0),
+        rotation: CoordUnit(0.0, 0.0, 0.0),
+    }];
+
+    set_and_wait!(
+        navi_node,
+        waypoints,
+        0.10,
+        executor,
+        "Forth building reached! Stopping navigation..."
+    );
+
+    match navi_node.call_yolo_blocking(
+        &mut executor,
+        Some("e_bike"),
+        Some("camera2"),
+        Duration::from_secs_f32(2.0),
+    ) {
+        Ok(yolo_response) => {
+            println!("yolo: {:?}", yolo_response.message);
+        }
+        Err(err) => {
+            log_info!(
+                "navi_main",
+                "YOLO service unavailable or timed out, continuing without detection: {:?}",
+                err
+            );
+        }
+    }
+
+    let waypoints = vec![Pos {
+        translation: CoordUnit(0.6, 0.7, 0.0),
+        rotation: CoordUnit(0.0, 0.0, 0.0),
+    }];
+
+    set_and_wait!(
+        navi_node,
+        waypoints,
+        0.10,
+        executor,
+        "Fifth automobile reached! Stopping navigation..."
+    );
+
+    match navi_node.call_yolo_blocking(
+        &mut executor,
+        Some("e_bike"),
+        Some("camera2"),
+        Duration::from_secs_f32(2.0),
+    ) {
+        Ok(yolo_response) => {
+            println!("yolo: {:?}", yolo_response.message);
+        }
+        Err(err) => {
+            log_info!(
+                "navi_main",
+                "YOLO service unavailable or timed out, continuing without detection: {:?}",
+                err
+            );
+        }
+    }
+
+    let waypoints = vec![
         Pos {
             translation: CoordUnit(0.6, 0.0, 0.0),
             rotation: CoordUnit(0.0, 0.0, 6.28),
@@ -184,19 +442,13 @@ fn main() -> anyhow::Result<()> {
         },
     ];
 
-    navi_node.set_destinations(waypoints, 0.10)?;
-    loop {
-        let mut spin_options = SpinOptions::default();
-        spin_options.timeout = Some(Duration::from_millis(100));
-        spin_options.only_next_available_work = true;
-        spin_options.until_promise_resolved = None;
-        executor.spin(spin_options);
-
-        if navi_node.is_arrived() {
-            log_info!("navi_main", "All waypoints reached! Stopping navigation...");
-            break;
-        }
-    }
+    set_and_wait!(
+        navi_node,
+        waypoints,
+        0.10,
+        executor,
+        "All waypoints reached! Stopping navigation..."
+    );
 
     log_info!("navi_main", "Navigation completed, exiting cleanly");
     Ok(())

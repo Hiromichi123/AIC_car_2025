@@ -14,12 +14,19 @@ ocr_packages = [
     'ocr.ppocr.postprocess',
     'ocr.ppocr.utils',
     'ocr.tools',
+    'ocr.tools.infer',
+    # 'ocr.ppocr.utils.e2e_utils',
 ]
 
 setup(
     name=package_name,
     version='0.0.1',
     packages=find_packages(exclude=['test']) + ocr_packages,
+    package_data={
+        # ship OCR dictionaries inside the wheel so site-packages has them
+        'ocr.ppocr.utils': ['*.txt', 'dict/*.txt'],
+    },
+    include_package_data=True,
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
@@ -29,10 +36,10 @@ setup(
             glob('ocr/ppocr/utils/*.txt')),
         # 安装YOLO字体文件（但实际使用源码目录的文件）
         ('share/' + package_name + '/yolo',
-            glob('yolo/*.ttf') if os.path.exists('yolo') else []),
+            (glob('yolo/*.ttf') + glob('yolo/*.pt')) if os.path.exists('yolo') else []),
     ],
     install_requires=['setuptools'],
-    zip_safe=True,
+    zip_safe=False,
     maintainer='dev',
     maintainer_email='fermata@h2o.moe',
     description='vision node for ocr and obj dectection',

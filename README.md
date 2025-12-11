@@ -61,11 +61,8 @@ ros2 launch robot_real slam.launch.py
 # 启动工具
 ros2 launch ros2_tools tools_real.launch.py
 
-# 运行测试节点
-ros2 run robot_real simple_goal.launch.py
-
 # 启动视觉节点
-ros2 launch ros2_tools tools_real.launch.py
+ros2 run vision_node vision_real
 
 # 启动导航
 ros2 run navi_rs navi_rs

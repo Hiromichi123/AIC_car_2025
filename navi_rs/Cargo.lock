@@ -1021,6 +1021,10 @@ name = "rclrs_example_msgs"
 version = "0.5.0"
 
 [[patch.unused]]
+name = "realsense2_camera_msgs"
+version = "4.56.4"
+
+[[patch.unused]]
 name = "rosgraph_msgs"
 version = "1.2.2"
 

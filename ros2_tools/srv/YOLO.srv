@@ -1,3 +1,5 @@
+string model   # 模型名或权重路径，留空使用默认
+string camera  # camera1/camera2/both，留空表示 both
 ---
 bool success
 string message

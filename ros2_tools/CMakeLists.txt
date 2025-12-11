@@ -26,6 +26,7 @@ find_package(rosidl_generator_rs REQUIRED)
 rosidl_generate_interfaces(${PROJECT_NAME} 
   "msg/LidarPose.msg"
   "srv/OCR.srv"
+  "srv/SERVO.srv"
   "srv/YOLO.srv"
 )
 

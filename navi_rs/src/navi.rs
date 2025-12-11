@@ -2,10 +2,43 @@ use geometry_msgs::msg::PoseStamped;
 use rclrs::{log_info, Client, Publisher};
 use rclrs::{SubscriptionState, WorkerState};
 use ros2_tools::msg::LidarPose;
-use ros2_tools::srv::{OCR_Request, OCR_Response, YOLO_Request, YOLO_Response, OCR, YOLO};
+use ros2_tools::srv::{
+    OCR_Request, OCR_Response, SERVO_Request, SERVO_Response, YOLO_Request, YOLO_Response, OCR,
+    SERVO, YOLO,
+};
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
+
+macro_rules! spin_until_response {
+    ($executor:expr, $promise:expr, $timeout:expr, $svc:literal) => {{
+        let time_start = Instant::now();
+        loop {
+            if time_start.elapsed() > $timeout {
+                break Err(anyhow::anyhow!(
+                    concat!($svc, " service call timeout after {:?}"),
+                    $timeout
+                ));
+            }
+
+            let mut spin_options = rclrs::SpinOptions::default();
+            spin_options.timeout = Some(Duration::from_millis(10));
+            spin_options.only_next_available_work = true;
+            $executor.spin(spin_options);
+
+            match $promise.try_recv() {
+                Ok(Some(r)) => break Ok(r),
+                Ok(None) => continue,
+                Err(e) => {
+                    break Err(anyhow::anyhow!(
+                        concat!($svc, " service call failed: {:?}"),
+                        e
+                    ));
+                }
+            }
+        }
+    }};
+}
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct CoordUnit(pub f64, pub f64, pub f64);
@@ -14,6 +47,12 @@ pub struct CoordUnit(pub f64, pub f64, pub f64);
 pub struct Pos {
     pub translation: CoordUnit, // (x, y, z)
     pub rotation: CoordUnit,    // (roll, pitch, yaw)
+}
+
+pub enum ServoState {
+    RIGHT,
+    CENTER,
+    LEFT,
 }
 
 #[derive(Debug, Default)]
@@ -32,6 +71,7 @@ pub struct NaviSubNode {
     goal_publisher: Publisher<PoseStamped>,
     yolo_client: Arc<Client<YOLO>>,
     ocr_client: Arc<Client<OCR>>,
+    servo_client: Arc<Client<SERVO>>,
     _subscription: Arc<SubscriptionState<LidarPose, Arc<WorkerState<LidarPose>>>>,
 }
 
@@ -192,6 +232,7 @@ impl NaviSubNode {
 
         let yolo_client = node.create_client::<YOLO>("yolo_trigger")?;
         let ocr_client = node.create_client::<OCR>("ocr_trigger")?;
+        let servo_client = node.create_client::<SERVO>("servo_control")?;
 
         let navi_instance = Arc::new(Mutex::new(Navi::new()));
         let navi_instance_clone = Arc::clone(&navi_instance);
@@ -220,6 +261,7 @@ impl NaviSubNode {
             goal_publisher,
             yolo_client: Arc::new(yolo_client),
             ocr_client: Arc::new(ocr_client),
+            servo_client: Arc::new(servo_client),
             _subscription,
         })
     }
@@ -228,11 +270,15 @@ impl NaviSubNode {
     pub fn call_yolo_blocking(
         &self,
         executor: &mut rclrs::Executor,
+        model: Option<&str>,
+        camera: Option<&str>,
         timeout: Duration,
     ) -> anyhow::Result<YOLO_Response> {
         log_info!("navi", "Calling YOLO service (blocking)...");
 
-        let request = YOLO_Request::default();
+        let mut request = YOLO_Request::default();
+        request.model = model.unwrap_or("").to_string();
+        request.camera = camera.unwrap_or("both").to_string();
 
         // 发送一次请求，然后阻塞等待响应
         log_info!("navi", "calling yolo service");
@@ -240,33 +286,7 @@ impl NaviSubNode {
             .yolo_client
             .call(&request)
             .map_err(|e| anyhow::anyhow!("YOLO service call failed: {:?}", e))?;
-
-        let time_start = Instant::now();
-        let response: YOLO_Response = loop {
-            if time_start.elapsed() > timeout {
-                return Err(anyhow::anyhow!(
-                    "YOLO service call timeout after {:?}",
-                    timeout
-                ));
-            }
-
-            // 需要 spin executor 来处理服务响应
-            let mut spin_options = rclrs::SpinOptions::default();
-            spin_options.timeout = Some(Duration::from_millis(10));
-            spin_options.only_next_available_work = true;
-            executor.spin(spin_options);
-
-            match promise.try_recv() {
-                Ok(Some(r)) => break r,
-                Ok(None) => {
-                    // 服务响应还未到达，继续等待
-                    continue;
-                }
-                Err(e) => {
-                    return Err(anyhow::anyhow!("YOLO service call failed: {:?}", e));
-                }
-            }
-        };
+        let response: YOLO_Response = spin_until_response!(executor, promise, timeout, "YOLO")?;
 
         log_info!(
             "navi",
@@ -293,37 +313,43 @@ impl NaviSubNode {
             .ocr_client
             .call(&request)
             .map_err(|e| anyhow::anyhow!("OCR service call failed: {:?}", e))?;
-
-        let time_start = Instant::now();
-        let response: OCR_Response = loop {
-            if time_start.elapsed() > timeout {
-                return Err(anyhow::anyhow!(
-                    "OCR service call timeout after {:?}",
-                    timeout
-                ));
-            }
-
-            // 需要 spin executor 来处理服务响应
-            let mut spin_options = rclrs::SpinOptions::default();
-            spin_options.timeout = Some(Duration::from_millis(10));
-            spin_options.only_next_available_work = true;
-            executor.spin(spin_options);
-
-            match promise.try_recv() {
-                Ok(Some(r)) => break r,
-                Ok(None) => {
-                    // 服务响应还未到达，继续等待
-                    continue;
-                }
-                Err(e) => {
-                    return Err(anyhow::anyhow!("OCR service call failed: {:?}", e));
-                }
-            }
-        };
+        let response: OCR_Response = spin_until_response!(executor, promise, timeout, "OCR")?;
 
         log_info!(
             "navi",
             "OCR response - success: {}, message: {}",
+            response.success,
+            response.message
+        );
+        Ok(response)
+    }
+
+    /// 阻塞调用 SERVO 服务，命令取值 {-1,0,1}
+    pub fn call_servo_blocking(
+        &self,
+        executor: &mut rclrs::Executor,
+        command: ServoState,
+        timeout: Duration,
+    ) -> anyhow::Result<SERVO_Response> {
+        log_info!("navi", "Calling SERVO service (blocking)...");
+
+        let mut request = SERVO_Request::default();
+
+        request.command = match command {
+            ServoState::LEFT => -1,
+            ServoState::CENTER => 0,
+            ServoState::RIGHT => 1,
+        };
+
+        let mut promise = self
+            .servo_client
+            .call(&request)
+            .map_err(|e| anyhow::anyhow!("SERVO service call failed: {:?}", e))?;
+        let response: SERVO_Response = spin_until_response!(executor, promise, timeout, "SERVO")?;
+
+        log_info!(
+            "navi",
+            "SERVO response - success: {}, message: {}",
             response.success,
             response.message
         );
