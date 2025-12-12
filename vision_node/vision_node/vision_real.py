@@ -5,6 +5,7 @@ import numpy as np
 import rclpy
 import time
 from rclpy.node import Node
+from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy, QoSPresetProfiles
 from sensor_msgs.msg import Image
@@ -65,7 +66,12 @@ class VisionNode(Node):
 
         # 创建订阅者
         # 相机话题通常使用 sensor data QoS，避免可靠模式导致丢帧阻塞
-        qos_profile = QoSPresetProfiles.SENSOR_DATA.value
+        # 使用 KeepLast(1) 确保获取最新图像，减少延迟
+        qos_profile = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1
+        )
         # 普通相机
         self.camera1_image_sub = self.create_subscription(
             Image, camera1_topic, self.camera1_image_callback, qos_profile, callback_group=self.cb_group
@@ -187,7 +193,9 @@ class VisionNode(Node):
         deadline = time.time() + max_wait
 
         while time.time() < deadline:
-            rclpy.spin_once(self, timeout_sec=0.0) # 主动处理回调，更新最新图像
+            # 等待0.3s以确保图像稳定，并更新最新图像
+            time.sleep(0.3)
+            
             ts = time.strftime("%Y%m%d-%H%M%S") + f"_{int(time.time() * 1000) % 1000:03d}"
             
             # 获取当前相机图像
@@ -207,7 +215,7 @@ class VisionNode(Node):
                     model,
                     model_name,
                     suppress_empty_warn=True,
-                    save_result=True,
+                    save_result=False,
                     return_frame=True,
                 )
                 all_results.extend(det_results)
@@ -230,6 +238,9 @@ class VisionNode(Node):
 
     def _handle_standard_detection(self, request, response, model, model_path, model_name, camera_mode):
         """处理标准一次性检测"""
+        # 等待0.3s以确保图像稳定，并更新最新图像
+        time.sleep(0.3)
+
         ts = time.strftime("%Y%m%d-%H%M%S")
         
         # 获取相机图像
@@ -315,64 +326,84 @@ class VisionNode(Node):
         """
         detection_results = []
 
-        time.sleep(0.5)  # 确保图像稳定
         # YOLO检测，输入尺寸960
         results = model(frame, imgsz=960)  # type: ignore
-        # 保护：无结果则直接返回
-        if not results or results[0].boxes is None:
-            if not suppress_empty_warn:
-                self.get_logger().warn(f"{camera_name} 未检测到目标，结果为空")
-            return ([], frame) if return_frame else []
-
-        boxes = results[0].boxes
-        if len(boxes) == 0:
-            if not suppress_empty_warn:
-                self.get_logger().info(f"{camera_name} 未检测到目标")
-            return ([], frame) if return_frame else []
-
-        # 获取当前模型的标签和颜色配置
-        model_config = self.yolo_labels_config.get(
-            model_name, self.yolo_labels_config["default"]
-        )
-        label_map = model_config.get("labels", {})
-        color_map = model_config.get("colors", {})
-
-        # 转换为PIL图像以绘制中文
+        
+        # 准备绘制
         img_pil = PILImage.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
         draw = ImageDraw.Draw(img_pil)
-
+        
         # 加载字体
         try:
             font = ImageFont.truetype(self.yolo_font_path, 28, encoding="utf-8")
         except:
             font = ImageFont.load_default()
 
-        # 处理每个检测框
-        for box in boxes:
-            cls_id = int(box.cls)
-            conf = float(box.conf)
+        has_detections = False
+        
+        # 1. 处理目标检测结果 (Boxes)
+        if results and results[0].boxes is not None and len(results[0].boxes) > 0:
+            has_detections = True
+            boxes = results[0].boxes
+
+            # 获取当前模型的标签和颜色配置
+            model_config = self.yolo_labels_config.get(
+                model_name, self.yolo_labels_config["default"]
+            )
+            label_map = model_config.get("labels", {})
+            color_map = model_config.get("colors", {})
+
+            # 处理每个检测框
+            for box in boxes:
+                cls_id = int(box.cls)
+                conf = float(box.conf)
+                
+                # 优先使用自定义映射
+                if cls_id in self.custom_label_map:
+                    label = self.custom_label_map[cls_id]
+                    color = self.custom_color_map.get(cls_id, (255, 255, 255))
+                else:
+                    label = label_map.get(cls_id, f"未知类别({cls_id})")
+                    color = color_map.get(cls_id, (255, 255, 255))
+
+                x1, y1, x2, y2 = map(int, box.xyxy[0])
+
+                # 绘制矩形框
+                draw.rectangle([x1, y1, x2, y2], outline=color, width=3)
+
+                # 绘制中文标签
+                text = f"{label} {conf:.2f}"
+                draw.text((x1, y1 - 30), text, font=font, fill=color)
+
+                # 记录结果
+                result_str = f"[{camera_name}] {label} (置信度: {conf:.2f})"
+                detection_results.append(result_str)
+        
+        # 2. 处理图像分类结果 (Probs) - 针对交通灯分类模型
+        elif results and hasattr(results[0], 'probs') and results[0].probs is not None:
+            has_detections = True
+            probs = results[0].probs
+            # 获取置信度最高的类别
+            top1_index = int(probs.top1)
+            conf = float(probs.top1conf)
             
-            # 优先使用自定义映射
-            if cls_id in self.custom_label_map:
-                label = self.custom_label_map[cls_id]
-                color = self.custom_color_map.get(cls_id, (255, 255, 255))
-            else:
-                label = label_map.get(cls_id, f"未知类别({cls_id})")
-                color = color_map.get(cls_id, (255, 255, 255))
-
-            x1, y1, x2, y2 = map(int, box.xyxy[0])
-
-            # 绘制矩形框
-            draw.rectangle([x1, y1, x2, y2], outline=color, width=3)
-
-            # 绘制中文标签
-            text = f"{label} {conf:.2f}"
-            draw.text((x1, y1 - 30), text, font=font, fill=color)
-
-            # 记录结果
-            result_str = f"[{camera_name}] {label} (置信度: {conf:.2f})"
+            # 获取类别名称
+            label = results[0].names[top1_index] if results[0].names else str(top1_index)
+            
+            # 映射英文标签到中文，以便后续逻辑判断
+            display_label = label
+            if "green" in label.lower():
+                display_label = "绿灯"
+            elif "red" in label.lower():
+                display_label = "红灯"
+            elif "yellow" in label.lower():
+                display_label = "黄灯"
+            
+            result_str = f"[{camera_name}] {display_label} (置信度: {conf:.2f})"
             detection_results.append(result_str)
-            # self.get_logger().info(f"检测到: {result_str}")
+            
+            # 在左上角绘制分类结果
+            draw.text((30, 30), f"Type: {display_label} {conf:.2f}", font=font, fill=(0, 255, 0))
 
         # 转回OpenCV格式
         frame = cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
@@ -384,6 +415,10 @@ class VisionNode(Node):
             )
             cv2.imwrite(result_path, frame)
             self.get_logger().info(f"✅ {camera_name}检测结果已保存到: {result_path}")
+            
+        if not has_detections:
+             if not suppress_empty_warn:
+                self.get_logger().info(f"{camera_name} 未检测到目标")
 
         if return_frame:
             return detection_results, frame
@@ -492,7 +527,9 @@ class VisionNode(Node):
 def main(args=None):
     rclpy.init(args=args)
     vision_node = VisionNode()
-    rclpy.spin(vision_node)
+    executor = MultiThreadedExecutor()
+    executor.add_node(vision_node)
+    executor.spin()
     rclpy.shutdown()
 
 
