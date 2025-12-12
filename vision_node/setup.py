@@ -20,10 +20,9 @@ ocr_packages = [
 
 setup(
     name=package_name,
-    version='0.0.1',
+    version='1.0.0',
     packages=find_packages(exclude=['test']) + ocr_packages,
     package_data={
-        # ship OCR dictionaries inside the wheel so site-packages has them
         'ocr.ppocr.utils': ['*.txt', 'dict/*.txt'],
     },
     include_package_data=True,

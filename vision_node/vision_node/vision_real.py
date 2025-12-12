@@ -5,6 +5,7 @@ import numpy as np
 import rclpy
 import time
 from rclpy.node import Node
+from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy, QoSPresetProfiles
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
@@ -59,40 +60,59 @@ class VisionNode(Node):
             "camera2_topic", "camera/d435/color/image_raw"
         ).value
 
+        # 使用 ReentrantCallbackGroup 允许在服务回调中处理图像订阅
+        self.cb_group = ReentrantCallbackGroup()
+
         # 创建订阅者
         # 相机话题通常使用 sensor data QoS，避免可靠模式导致丢帧阻塞
         qos_profile = QoSPresetProfiles.SENSOR_DATA.value
         # 普通相机
         self.camera1_image_sub = self.create_subscription(
-            Image, camera1_topic, self.camera1_image_callback, qos_profile
+            Image, camera1_topic, self.camera1_image_callback, qos_profile, callback_group=self.cb_group
         )
         # 深度相机
         self.camera2_image_sub = self.create_subscription(
-            Image, camera2_topic, self.camera2_image_callback, qos_profile
+            Image, camera2_topic, self.camera2_image_callback, qos_profile, callback_group=self.cb_group
         )
-        self.srv_yolo = self.create_service(YOLO, "yolo_trigger", self.yolo_callback)
-        self.srv_ocr = self.create_service(OCR, "ocr_trigger", self.ocr_callback)
+        self.srv_yolo = self.create_service(YOLO, "yolo_trigger", self.yolo_callback, callback_group=self.cb_group)
+        self.srv_ocr = self.create_service(OCR, "ocr_trigger", self.ocr_callback, callback_group=self.cb_group)
+
+        # 交通灯检测参数
+        self.declare_parameter("traffic_light_max_wait", 20.0)
+        self.declare_parameter("traffic_light_poll_interval", 0.5)
 
         # 初始化YOLO模型 - 支持多模型
         self.yolo_model_path_default = config.YOLO_MODEL_PATH
         self.yolo_font_path = config.YOLO_FONT_PATH
-        self.yolo_save_dir = config.YOLO_SAVE_DIR
+        self.yolo_save_dir = "/home/jetson/ros2/AIC_car_2025/vision_node/yolo/result"
         os.makedirs(self.yolo_save_dir, exist_ok=True)
 
-        self.yolo_models = {}  # 缓存已加载模型: name -> (model, path)
+        self.yolo_models = {}  # 缓存已加载模型
         self.yolo_model_paths = config.YOLO_MODELS
 
         # YOLO模型标签配置 - 按模型名称分类
         self.yolo_labels_config = config.YOLO_LABELS
 
-        # 初始化PaddleOCR - 使用配置文件中的模型
+        # Custom maps
+        self.custom_color_map = {
+            0: (255, 0, 0),     # 社区/人类类目 1
+            1: (0, 255, 0),     # 社区/人类类目 2
+            2: (0, 0, 255),     # 红灯
+            3: (0, 255, 255),   # 绿灯
+            4: (255, 255, 0),   # 黄灯
+        }
+        self.custom_label_map = {
+            0: "target_1",
+            1: "target_2",
+            2: "红灯",
+            3: "绿灯",
+            4: "黄灯",
+        }
+
+        # 初始化PaddleOCR
         try:
-            self.ocr_engine = self._paddleocr_ctor(
-                **config.CURRENT_MODEL, show_log=False
-            )
-            self.get_logger().info("PaddleOCR引擎加载成功 - 使用模型:")
-            self.get_logger().info(f"检测模型: {config.CURRENT_MODEL['det_model_dir']}")
-            self.get_logger().info(f"识别模型: {config.CURRENT_MODEL['rec_model_dir']}")
+            self.ocr_engine = self._paddleocr_ctor(**config.CURRENT_MODEL, show_log=False)
+            self.get_logger().info("PaddleOCR引擎加载成功")
         except Exception as e:
             self.get_logger().error(f"PaddleOCR引擎加载失败: {e}")
             self.ocr_engine = None
@@ -114,14 +134,14 @@ class VisionNode(Node):
         if not os.path.isdir(ocr_dir):
             raise RuntimeError(f"未找到 PaddleOCR 目录: {ocr_dir}")
 
-    # Camera1 回调函数
+    # Camera1 回调
     def camera1_image_callback(self, msg):
         try:
             self.camera1_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
         except Exception as e:
             self.get_logger().error(f"Camera1图像转换失败: {e}")
 
-    # Camera2 回调函数
+    # Camera2 回调
     def camera2_image_callback(self, msg):
         try:
             self.camera2_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
@@ -147,37 +167,28 @@ class VisionNode(Node):
             return response
 
         try:
-            # 特殊逻辑：交通灯模型循环检测直到绿灯
+            # 交通灯模型循环检测直到绿灯
             if model_name == "traffic_light":
-                return self._handle_traffic_light_detection(
-                    request, response, model, model_path, model_name, camera_mode
-                )
+                return self._handle_traffic_light_detection(request, response, model, model_path, model_name, camera_mode)
             
-            # 默认一次性检测
-            return self._handle_standard_detection(
-                request, response, model, model_path, model_name, camera_mode
-            )
+            # 默认检测
+            return self._handle_standard_detection(request, response, model, model_path, model_name, camera_mode)
 
         except Exception as e:
-            self.get_logger().error(f"YOLO检测异常: {e}", exc_info=True)
+            self.get_logger().error(f"YOLO检测异常: {e}")
             response.success = False
             response.message = f"YOLO检测失败: {str(e)}"
             return response
 
     def _handle_traffic_light_detection(self, request, response, model, model_path, model_name, camera_mode):
         """处理交通灯检测 - 循环检测直到出现绿灯或超时"""
-        max_wait = self.declare_parameter("traffic_light_max_wait", 20.0).value
-        poll_interval = self.declare_parameter("traffic_light_poll_interval", 0.5).value
+        max_wait = self.get_parameter("traffic_light_max_wait").value
+        poll_interval = self.get_parameter("traffic_light_poll_interval").value
         deadline = time.time() + max_wait
 
-        self.get_logger().info(f"开始等待绿灯检测，最大等待时间: {max_wait}秒")
-
         while time.time() < deadline:
-            # 主动处理回调，更新最新图像
-            rclpy.spin_once(self, timeout_sec=0.0)
-            
-            # 获取当前时间戳
-            ts = time.strftime("%Y%m%d-%H%M%S")
+            rclpy.spin_once(self, timeout_sec=0.0) # 主动处理回调，更新最新图像
+            ts = time.strftime("%Y%m%d-%H%M%S") + f"_{int(time.time() * 1000) % 1000:03d}"
             
             # 获取当前相机图像
             current_images = self._get_camera_images(camera_mode)
@@ -196,7 +207,7 @@ class VisionNode(Node):
                     model,
                     model_name,
                     suppress_empty_warn=True,
-                    save_result=False,
+                    save_result=True,
                     return_frame=True,
                 )
                 all_results.extend(det_results)
@@ -204,20 +215,6 @@ class VisionNode(Node):
             # 检查是否检测到绿灯
             green_hits = [msg for msg in all_results if "绿灯" in msg]
             if green_hits:
-                # 保存检测到绿灯的帧
-                final_ts = time.strftime("%Y%m%d-%H%M%S")
-                for cam_name, frame in current_images:
-                    self._process_yolo_image(
-                        frame.copy(),
-                        f"{cam_name}_{final_ts}",
-                        cam_name,
-                        model,
-                        model_name,
-                        suppress_empty_warn=True,
-                        save_result=True,
-                        return_frame=False,
-                    )
-
                 response.success = True
                 response.message = f"检测到绿灯: {'; '.join(green_hits)}"
                 self.get_logger().info("✅ 绿灯检测成功")
@@ -354,12 +351,16 @@ class VisionNode(Node):
         for box in boxes:
             cls_id = int(box.cls)
             conf = float(box.conf)
-            label = label_map.get(cls_id, f"未知类别({cls_id})")
+            
+            # 优先使用自定义映射
+            if cls_id in self.custom_label_map:
+                label = self.custom_label_map[cls_id]
+                color = self.custom_color_map.get(cls_id, (255, 255, 255))
+            else:
+                label = label_map.get(cls_id, f"未知类别({cls_id})")
+                color = color_map.get(cls_id, (255, 255, 255))
 
             x1, y1, x2, y2 = map(int, box.xyxy[0])
-
-            # 根据类别设置颜色，默认白色
-            color = color_map.get(cls_id, (255, 255, 255))
 
             # 绘制矩形框
             draw.rectangle([x1, y1, x2, y2], outline=color, width=3)
@@ -371,7 +372,7 @@ class VisionNode(Node):
             # 记录结果
             result_str = f"[{camera_name}] {label} (置信度: {conf:.2f})"
             detection_results.append(result_str)
-            self.get_logger().info(f"检测到: {result_str}")
+            # self.get_logger().info(f"检测到: {result_str}")
 
         # 转回OpenCV格式
         frame = cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
@@ -389,7 +390,7 @@ class VisionNode(Node):
         return detection_results
 
     def _get_yolo_model(self, model_name: str):
-        """按需加载或复用 YOLO 模型，返回 (model, path)。"""
+        """按需加载或复用 YOLO 模型，返回 (model, path)"""
         chosen_path = None
 
         if model_name:
