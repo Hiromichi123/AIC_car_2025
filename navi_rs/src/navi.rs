@@ -289,6 +289,7 @@ impl NaviSubNode {
         let mut request = YOLO_Request::default();
         request.model = model.unwrap_or("").to_string();
         request.camera = camera.unwrap_or("both").to_string();
+        sleep(std::time::Duration::from_secs_f32(0.5));
 
         // 发送一次请求，然后阻塞等待响应
         log_info!("navi", "calling yolo service");
@@ -316,6 +317,7 @@ impl NaviSubNode {
         log_info!("navi", "Calling OCR service (blocking)...");
 
         let request = OCR_Request::default();
+        sleep(std::time::Duration::from_secs_f32(0.5));
 
         // 使用阻塞调用：等待 Promise 完成并获取响应
         log_info!("navi", "calling ocr service");
