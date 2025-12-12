@@ -56,21 +56,34 @@ fn main() -> anyhow::Result<()> {
         "First Camera point reached! Stopping navigation..."
     );
 
-    match navi_node.call_yolo_blocking(
-        &mut executor,
-        Some("traffic_light"),
-        Some("camera1"),
-        Duration::from_secs_f32(20.0),
-    ) {
-        Ok(yolo_response) => {
-            println!("yolo: {:?}", yolo_response.message);
-        }
-        Err(err) => {
-            log_info!(
-                "navi_main",
-                "YOLO service unavailable or timed out, continuing without detection: {:?}",
-                err
-            );
+    // 循环检测交通灯，直到检测到绿灯
+    log_info!("navi_main", "Waiting for green light...");
+    loop {
+        match navi_node.call_yolo_blocking(
+            &mut executor,
+            Some("traffic_light"),
+            Some("camera1"),
+            Duration::from_secs_f32(2.0),
+        ) {
+            Ok(yolo_response) => {
+                log_info!(
+                    "navi_main",
+                    "Traffic light detection: {:?}",
+                    yolo_response.message
+                );
+                // 检查响应中是否包含"绿灯"
+                if yolo_response.message.contains("绿灯") {
+                    log_info!("navi_main", "Green light detected! Proceeding...");
+                    break;
+                } else {
+                    log_info!("navi_main", "No green light yet, retrying...");
+                    sleep(Duration::from_millis(500));
+                }
+            }
+            Err(err) => {
+                log_info!("navi_main", "YOLO service call failed, retrying: {:?}", err);
+                sleep(Duration::from_millis(500));
+            }
         }
     }
 
@@ -272,21 +285,33 @@ fn main() -> anyhow::Result<()> {
         log_info!("navi_main", "SERVO left command failed: {:?}", err);
     }
 
-    match navi_node.call_yolo_blocking(
-        &mut executor,
-        Some("traffic_light"),
-        Some("camera1"),
-        Duration::from_secs_f32(20.0),
-    ) {
-        Ok(yolo_response) => {
-            println!("yolo: {:?}", yolo_response.message);
-        }
-        Err(err) => {
-            log_info!(
-                "navi_main",
-                "YOLO service unavailable or timed out, continuing without detection: {:?}",
-                err
-            );
+    log_info!("navi_main", "Waiting for green light...");
+    loop {
+        match navi_node.call_yolo_blocking(
+            &mut executor,
+            Some("traffic_light"),
+            Some("camera1"),
+            Duration::from_secs_f32(2.0),
+        ) {
+            Ok(yolo_response) => {
+                log_info!(
+                    "navi_main",
+                    "Traffic light detection: {:?}",
+                    yolo_response.message
+                );
+                // 检查响应中是否包含"绿灯"
+                if yolo_response.message.contains("绿灯") {
+                    log_info!("navi_main", "Green light detected! Proceeding...");
+                    break;
+                } else {
+                    log_info!("navi_main", "No green light yet, retrying...");
+                    sleep(Duration::from_millis(500));
+                }
+            }
+            Err(err) => {
+                log_info!("navi_main", "YOLO service call failed, retrying: {:?}", err);
+                sleep(Duration::from_millis(500));
+            }
         }
     }
 
