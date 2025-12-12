@@ -132,11 +132,14 @@ class VisionNode(Node):
         """YOLO检测服务回调函数 - 支持指定模型与相机"""
         model_name = request.model.strip()
         camera_mode = (request.camera or "").strip().lower() or "both"
+        
+        # 验证相机参数
         if camera_mode not in ("camera1", "camera2", "both"):
             response.success = False
             response.message = f"不支持的 camera 参数: {request.camera}"
             return response
 
+        # 加载指定模型
         model, model_path = self._get_yolo_model(model_name)
         if model is None:
             response.success = False
@@ -144,133 +147,151 @@ class VisionNode(Node):
             return response
 
         try:
-
-            def process_cam(
-                name: str,
-                frame,
-                ts: str,
-                suppress_empty_warn: bool = False,
-                save_result: bool = True,
-                return_frame: bool = False,
-            ):
-                self.get_logger().info(f"处理{name}图像... 使用模型: {model_path}")
-                return self._process_yolo_image(
-                    frame.copy(),
-                    f"{name}_{ts}",
-                    name,
-                    model,
-                    model_name,
-                    suppress_empty_warn=suppress_empty_warn,
-                    save_result=save_result,
-                    return_frame=return_frame,
-                )
-
-            camera_sources = []
-            if camera_mode in ("camera1", "both"):
-                camera_sources.append(("Camera1", self.camera1_image))
-            if camera_mode in ("camera2", "both"):
-                camera_sources.append(("Camera2", self.camera2_image))
-
-            # 特殊逻辑：交通灯模型等待"绿灯"出现
+            # 特殊逻辑：交通灯模型循环检测直到绿灯
             if model_name == "traffic_light":
-                max_wait = self.declare_parameter("traffic_light_max_wait", 20.0).value
-                poll_interval = self.declare_parameter(
-                    "traffic_light_poll_interval", 0.5
-                ).value
-                deadline = time.time() + max_wait
-
-                self.get_logger().info(f"开始等待绿灯检测，最大等待时间: {max_wait}秒")
-
-                while time.time() < deadline:
-                    ts = time.strftime("%Y%m%d-%H%M%S")
-                    all_detection_results = []
-                    processed = False
-                    missing = []
-
-                    for label, image in camera_sources:
-                        if image is None:
-                            missing.append(label)
-                            continue
-                        processed = True
-                        det_results, frame_processed = process_cam(
-                            label,
-                            image,
-                            ts,
-                            suppress_empty_warn=True,
-                            save_result=False,
-                            return_frame=True,
-                        )
-                        all_detection_results.extend(det_results)
-
-                    if not processed:
-                        response.success = False
-                        response.message = (
-                            f"{'、'.join(missing)}图像未接收"
-                            if missing
-                            else "未接收到可用图像"
-                        )
-                        return response
-
-                    # 判断是否出现绿灯
-                    green_hits = [msg for msg in all_detection_results if "绿灯" in msg]
-                    if green_hits:
-                        # 保存检测到绿灯的最后一帧
-                        final_ts = time.strftime("%Y%m%d-%H%M%S")
-                        for label, image in camera_sources:
-                            if image is not None:
-                                process_cam(
-                                    label,
-                                    image,
-                                    final_ts,
-                                    suppress_empty_warn=True,
-                                    save_result=True,
-                                    return_frame=False,
-                                )
-
-                        response.success = True
-                        response.message = f"检测到绿灯: {'; '.join(green_hits)}"
-                        self.get_logger().info(f"✅ 绿灯检测成功")
-                        return response
-
-                    time.sleep(poll_interval)
-
-                response.success = False
-                response.message = f"等待绿灯超时({max_wait}秒)"
-                self.get_logger().warn(f"⚠️ 绿灯检测超时")
-                return response
-
+                return self._handle_traffic_light_detection(
+                    request, response, model, model_path, model_name, camera_mode
+                )
+            
             # 默认一次性检测
-            ts = time.strftime("%Y%m%d-%H%M%S")
-            all_detection_results = []
-            processed = False
-            missing = []
-
-            for label, image in camera_sources:
-                if image is None:
-                    missing.append(label)
-                    continue
-                processed = True
-                all_detection_results.extend(process_cam(label, image, ts))
-
-            if not processed:
-                response.success = False
-                if missing:
-                    response.message = f"{'、'.join(missing)}图像未接收"
-                else:
-                    response.message = "未接收到可用图像"
-                return response
-
-            response.success = True
-            if all_detection_results:
-                response.message = f"YOLO检测到{len(all_detection_results)}个目标。结果: {'; '.join(all_detection_results)}"
-            else:
-                response.message = "YOLO未检测到目标"
+            return self._handle_standard_detection(
+                request, response, model, model_path, model_name, camera_mode
+            )
 
         except Exception as e:
+            self.get_logger().error(f"YOLO检测异常: {e}", exc_info=True)
             response.success = False
             response.message = f"YOLO检测失败: {str(e)}"
+            return response
 
+    def _handle_traffic_light_detection(self, request, response, model, model_path, model_name, camera_mode):
+        """处理交通灯检测 - 循环检测直到出现绿灯或超时"""
+        max_wait = self.declare_parameter("traffic_light_max_wait", 20.0).value
+        poll_interval = self.declare_parameter("traffic_light_poll_interval", 0.5).value
+        deadline = time.time() + max_wait
+
+        self.get_logger().info(f"开始等待绿灯检测，最大等待时间: {max_wait}秒")
+
+        while time.time() < deadline:
+            # 主动处理回调，更新最新图像
+            rclpy.spin_once(self, timeout_sec=0.0)
+            
+            # 获取当前时间戳
+            ts = time.strftime("%Y%m%d-%H%M%S")
+            
+            # 获取当前相机图像
+            current_images = self._get_camera_images(camera_mode)
+            if not current_images:
+                # 图像未就绪，继续等待
+                time.sleep(poll_interval)
+                continue
+
+            # 执行检测
+            all_results = []
+            for cam_name, frame in current_images:
+                det_results, _ = self._process_yolo_image(
+                    frame.copy(),
+                    f"{cam_name}_{ts}",
+                    cam_name,
+                    model,
+                    model_name,
+                    suppress_empty_warn=True,
+                    save_result=False,
+                    return_frame=True,
+                )
+                all_results.extend(det_results)
+
+            # 检查是否检测到绿灯
+            green_hits = [msg for msg in all_results if "绿灯" in msg]
+            if green_hits:
+                # 保存检测到绿灯的帧
+                final_ts = time.strftime("%Y%m%d-%H%M%S")
+                for cam_name, frame in current_images:
+                    self._process_yolo_image(
+                        frame.copy(),
+                        f"{cam_name}_{final_ts}",
+                        cam_name,
+                        model,
+                        model_name,
+                        suppress_empty_warn=True,
+                        save_result=True,
+                        return_frame=False,
+                    )
+
+                response.success = True
+                response.message = f"检测到绿灯: {'; '.join(green_hits)}"
+                self.get_logger().info("✅ 绿灯检测成功")
+                return response
+
+            time.sleep(poll_interval)
+
+        # 超时未检测到绿灯
+        response.success = False
+        response.message = f"等待绿灯超时({max_wait}秒)"
+        self.get_logger().warn("⚠️ 绿灯检测超时")
         return response
+
+    def _handle_standard_detection(self, request, response, model, model_path, model_name, camera_mode):
+        """处理标准一次性检测"""
+        ts = time.strftime("%Y%m%d-%H%M%S")
+        
+        # 获取相机图像
+        camera_images = self._get_camera_images(camera_mode)
+        if not camera_images:
+            response.success = False
+            response.message = self._get_missing_camera_message(camera_mode)
+            return response
+
+        # 执行检测
+        all_results = []
+        for cam_name, frame in camera_images:
+            self.get_logger().info(f"处理{cam_name}图像... 使用模型: {model_path}")
+            det_results = self._process_yolo_image(
+                frame.copy(),
+                f"{cam_name}_{ts}",
+                cam_name,
+                model,
+                model_name,
+                suppress_empty_warn=False,
+                save_result=True,
+                return_frame=False,
+            )
+            all_results.extend(det_results)
+
+        # 返回结果
+        response.success = True
+        if all_results:
+            response.message = f"YOLO检测到{len(all_results)}个目标。结果: {'; '.join(all_results)}"
+        else:
+            response.message = "YOLO未检测到目标"
+        
+        return response
+
+    def _get_camera_images(self, camera_mode):
+        """获取指定相机的当前图像，返回 [(camera_name, frame), ...] 列表"""
+        images = []
+        
+        if camera_mode in ("camera1", "both"):
+            if self.camera1_image is not None:
+                images.append(("Camera1", self.camera1_image))
+        
+        if camera_mode in ("camera2", "both"):
+            if self.camera2_image is not None:
+                images.append(("Camera2", self.camera2_image))
+        
+        return images
+
+    def _get_missing_camera_message(self, camera_mode):
+        """生成缺失相机的错误消息"""
+        missing = []
+        if camera_mode in ("camera1", "both") and self.camera1_image is None:
+            missing.append("Camera1")
+        if camera_mode in ("camera2", "both") and self.camera2_image is None:
+            missing.append("Camera2")
+        
+        if missing:
+            return f"{'、'.join(missing)}图像未接收"
+        return "未接收到可用图像"
 
     def _process_yolo_image(
         self,
@@ -297,7 +318,7 @@ class VisionNode(Node):
         """
         detection_results = []
 
-        time.sleep(0.3)  # 确保图像稳定
+        time.sleep(0.5)  # 确保图像稳定
         # YOLO检测，输入尺寸960
         results = model(frame, imgsz=960)  # type: ignore
         # 保护：无结果则直接返回
@@ -447,7 +468,7 @@ class VisionNode(Node):
         """处理单张图像的OCR识别"""
         ocr_results = []
 
-        time.sleep(0.3)  # 确保图像稳定
+        time.sleep(0.5)  # 确保图像稳定
         # OCR识别
         result = self.ocr_engine.ocr(frame, cls=True)
 
