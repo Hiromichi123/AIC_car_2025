@@ -52,7 +52,7 @@ fn main() -> anyhow::Result<()> {
         navi_node,
         waypoints,
         0.10,
-        0.10,
+        0.3,
         executor,
         "First Camera point reached! Stopping navigation..."
     );
@@ -94,7 +94,7 @@ fn main() -> anyhow::Result<()> {
         navi_node,
         waypoints,
         0.10,
-        0.10,
+        0.30,
         executor,
         "First person reached! Stopping navigation..."
     );
@@ -139,7 +139,7 @@ fn main() -> anyhow::Result<()> {
         navi_node,
         waypoints,
         0.10,
-        0.10,
+        0.30,
         executor,
         "Second person reached! Stopping navigation..."
     );
@@ -177,7 +177,7 @@ fn main() -> anyhow::Result<()> {
         navi_node,
         waypoints,
         0.10,
-        0.10,
+        0.30,
         executor,
         "Third person reached! Stopping navigation..."
     );
@@ -252,7 +252,7 @@ fn main() -> anyhow::Result<()> {
         navi_node,
         waypoints,
         0.10,
-        0.10,
+        0.30,
         executor,
         "All waypoints reached! Stopping navigation..."
     );
@@ -321,7 +321,7 @@ fn main() -> anyhow::Result<()> {
         navi_node,
         waypoints,
         0.2,
-        0.2,
+        0.3,
         executor,
         "All waypoints reached! Stopping navigation..."
     );
@@ -367,7 +367,7 @@ fn main() -> anyhow::Result<()> {
         navi_node,
         waypoints,
         0.10,
-        0.10,
+        0.30,
         executor,
         "First car reached! Stopping navigation..."
     );
@@ -402,7 +402,7 @@ fn main() -> anyhow::Result<()> {
         navi_node,
         waypoints,
         0.10,
-        0.10,
+        0.30,
         executor,
         "Forth building reached! Stopping navigation..."
     );
@@ -434,7 +434,7 @@ fn main() -> anyhow::Result<()> {
         navi_node,
         waypoints,
         0.10,
-        0.10,
+        0.30,
         executor,
         "Fifth automobile reached! Stopping navigation..."
     );
@@ -472,7 +472,7 @@ fn main() -> anyhow::Result<()> {
         navi_node,
         waypoints,
         0.10,
-        0.10,
+        0.30,
         executor,
         "All waypoints reached! Stopping navigation..."
     );
