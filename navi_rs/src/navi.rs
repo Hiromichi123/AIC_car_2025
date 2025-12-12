@@ -61,7 +61,8 @@ pub struct Navi {
     pub current_pos: Pos,
     pub velocity: Pos,
     pub is_arrived: bool,
-    arrive_threshold: f64,
+    translation_threshold: f64,
+    rotation_threshold: f64,
     current_waypoint_index: usize, // 当前目标点索引
 }
 
@@ -118,17 +119,24 @@ impl Navi {
     }
 
     /// 设置一系列目标点
-    fn set_destinations(&mut self, destinations: Vec<Pos>, threshold: f64) {
+    fn set_destinations(
+        &mut self,
+        destinations: Vec<Pos>,
+        translation_threshold: f64,
+        rotation_threshold: f64,
+    ) {
         if !destinations.is_empty() {
             self.dest_pos = destinations;
-            self.arrive_threshold = threshold;
+            self.translation_threshold = translation_threshold;
+            self.rotation_threshold = rotation_threshold;
             self.is_arrived = false;
             self.current_waypoint_index = 0;
             log_info!(
                 "set destinations",
-                "set {} waypoints, threshold: {:.2}",
+                "set {} waypoints, translation_threshold: {:.2}, rotation_threshold: {:.2}",
                 self.dest_pos.len(),
-                threshold
+                translation_threshold,
+                rotation_threshold
             );
         } else {
             log_info!("set destinations", "empty destination list provided");
@@ -164,9 +172,10 @@ impl Navi {
         let rotation_distance = dest_pos
             .rotation
             .cal_angular_distance(&self.current_pos.rotation);
-        let distance = translation_distance + rotation_distance;
 
-        if distance <= self.arrive_threshold {
+        if translation_distance <= self.translation_threshold
+            && rotation_distance <= self.rotation_threshold
+        {
             self.current_waypoint_index += 1;
 
             if self.current_waypoint_index >= self.dest_pos.len() {
@@ -191,12 +200,13 @@ impl Navi {
         } else {
             log_info!(
                 "pos update",
-                "waypoint {}/{}, distance: {:.2}m (trans: {:.2}, rot: {:.2})",
+                "waypoint {}/{}, trans: {:.2}m (threshold: {:.2}), rot: {:.2}rad (threshold: {:.2})",
                 self.current_waypoint_index + 1,
                 self.dest_pos.len(),
-                distance,
                 translation_distance,
-                rotation_distance
+                self.translation_threshold,
+                rotation_distance,
+                self.rotation_threshold
             );
             return Some(false);
         }
@@ -405,9 +415,14 @@ impl NaviSubNode {
     }
 
     /// 设置导航目标点列表
-    pub fn set_destinations(&self, destinations: Vec<Pos>, threshold: f64) -> anyhow::Result<()> {
+    pub fn set_destinations(
+        &self,
+        destinations: Vec<Pos>,
+        translation_threshold: f64,
+        rotation_threshold: f64,
+    ) -> anyhow::Result<()> {
         if let Ok(mut navi) = self.navi_instance.lock() {
-            navi.set_destinations(destinations, threshold);
+            navi.set_destinations(destinations, translation_threshold, rotation_threshold);
             // 立即发布第一个目标点
             Self::publish_goal_with(&self.goal_publisher, &*navi)?;
             Ok(())

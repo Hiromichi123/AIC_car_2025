@@ -16,8 +16,8 @@ macro_rules! spin_tick {
 }
 
 macro_rules! set_and_wait {
-    ($node:expr, $wps:expr, $th:expr, $exec:expr, $log:literal) => {{
-        $node.set_destinations($wps, $th)?;
+    ($node:expr, $wps:expr, $trans_th:expr, $rot_th:expr, $exec:expr, $log:literal) => {{
+        $node.set_destinations($wps, $trans_th, $rot_th)?;
         loop {
             spin_tick!($exec);
 
@@ -52,38 +52,36 @@ fn main() -> anyhow::Result<()> {
         navi_node,
         waypoints,
         0.10,
+        0.10,
         executor,
         "First Camera point reached! Stopping navigation..."
     );
 
     // 循环检测交通灯，直到检测到绿灯
     log_info!("navi_main", "Waiting for green light...");
-    loop {
-        match navi_node.call_yolo_blocking(
-            &mut executor,
-            Some("traffic_light"),
-            Some("camera1"),
-            Duration::from_secs_f32(2.0),
-        ) {
-            Ok(yolo_response) => {
-                log_info!(
-                    "navi_main",
-                    "Traffic light detection: {:?}",
-                    yolo_response.message
-                );
-                // 检查响应中是否包含"绿灯"
-                if yolo_response.message.contains("绿灯") {
-                    log_info!("navi_main", "Green light detected! Proceeding...");
-                    break;
-                } else {
-                    log_info!("navi_main", "No green light yet, retrying...");
-                    sleep(Duration::from_millis(500));
-                }
-            }
-            Err(err) => {
-                log_info!("navi_main", "YOLO service call failed, retrying: {:?}", err);
+    match navi_node.call_yolo_blocking(
+        &mut executor,
+        Some("traffic_light"),
+        Some("camera1"),
+        Duration::from_secs_f32(2.0),
+    ) {
+        Ok(yolo_response) => {
+            log_info!(
+                "navi_main",
+                "Traffic light detection: {:?}",
+                yolo_response.message
+            );
+            // 检查响应中是否包含"绿灯"
+            if yolo_response.message.contains("绿灯") {
+                log_info!("navi_main", "Green light detected! Proceeding...");
+            } else {
+                log_info!("navi_main", "No green light yet, retrying...");
                 sleep(Duration::from_millis(500));
             }
+        }
+        Err(err) => {
+            log_info!("navi_main", "YOLO service call failed, retrying: {:?}", err);
+            sleep(Duration::from_millis(500));
         }
     }
 
@@ -95,6 +93,7 @@ fn main() -> anyhow::Result<()> {
     set_and_wait!(
         navi_node,
         waypoints,
+        0.10,
         0.10,
         executor,
         "First person reached! Stopping navigation..."
@@ -140,6 +139,7 @@ fn main() -> anyhow::Result<()> {
         navi_node,
         waypoints,
         0.10,
+        0.10,
         executor,
         "Second person reached! Stopping navigation..."
     );
@@ -176,6 +176,7 @@ fn main() -> anyhow::Result<()> {
     set_and_wait!(
         navi_node,
         waypoints,
+        0.10,
         0.10,
         executor,
         "Third person reached! Stopping navigation..."
@@ -251,6 +252,7 @@ fn main() -> anyhow::Result<()> {
         navi_node,
         waypoints,
         0.10,
+        0.10,
         executor,
         "All waypoints reached! Stopping navigation..."
     );
@@ -286,32 +288,27 @@ fn main() -> anyhow::Result<()> {
     }
 
     log_info!("navi_main", "Waiting for green light...");
-    loop {
-        match navi_node.call_yolo_blocking(
-            &mut executor,
-            Some("traffic_light"),
-            Some("camera1"),
-            Duration::from_secs_f32(2.0),
-        ) {
-            Ok(yolo_response) => {
-                log_info!(
-                    "navi_main",
-                    "Traffic light detection: {:?}",
-                    yolo_response.message
-                );
-                // 检查响应中是否包含"绿灯"
-                if yolo_response.message.contains("绿灯") {
-                    log_info!("navi_main", "Green light detected! Proceeding...");
-                    break;
-                } else {
-                    log_info!("navi_main", "No green light yet, retrying...");
-                    sleep(Duration::from_millis(500));
-                }
+    match navi_node.call_yolo_blocking(
+        &mut executor,
+        Some("traffic_light"),
+        Some("camera1"),
+        Duration::from_secs_f32(2.0),
+    ) {
+        Ok(yolo_response) => {
+            log_info!(
+                "navi_main",
+                "Traffic light detection: {:?}",
+                yolo_response.message
+            );
+            // 检查响应中是否包含"绿灯"
+            if yolo_response.message.contains("绿灯") {
+                log_info!("navi_main", "Green light detected! Proceeding...");
+            } else {
+                log_info!("navi_main", "No green light yet, retrying...");
             }
-            Err(err) => {
-                log_info!("navi_main", "YOLO service call failed, retrying: {:?}", err);
-                sleep(Duration::from_millis(500));
-            }
+        }
+        Err(err) => {
+            log_info!("navi_main", "YOLO service call failed, retrying: {:?}", err);
         }
     }
 
@@ -323,6 +320,7 @@ fn main() -> anyhow::Result<()> {
     set_and_wait!(
         navi_node,
         waypoints,
+        0.2,
         0.2,
         executor,
         "All waypoints reached! Stopping navigation..."
@@ -369,6 +367,7 @@ fn main() -> anyhow::Result<()> {
         navi_node,
         waypoints,
         0.10,
+        0.10,
         executor,
         "First car reached! Stopping navigation..."
     );
@@ -403,6 +402,7 @@ fn main() -> anyhow::Result<()> {
         navi_node,
         waypoints,
         0.10,
+        0.10,
         executor,
         "Forth building reached! Stopping navigation..."
     );
@@ -433,6 +433,7 @@ fn main() -> anyhow::Result<()> {
     set_and_wait!(
         navi_node,
         waypoints,
+        0.10,
         0.10,
         executor,
         "Fifth automobile reached! Stopping navigation..."
@@ -470,6 +471,7 @@ fn main() -> anyhow::Result<()> {
     set_and_wait!(
         navi_node,
         waypoints,
+        0.10,
         0.10,
         executor,
         "All waypoints reached! Stopping navigation..."
