@@ -7,7 +7,7 @@ import time
 from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import ReentrantCallbackGroup
-from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy, QoSPresetProfiles
+from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 from importlib import import_module
@@ -55,18 +55,11 @@ class VisionNode(Node):
         self.camera1_image = None  # 单目旋转相机
         self.camera2_image = None  # 双目固定相机
 
-        # 允许自定义相机话题
-        camera1_topic = self.declare_parameter("camera1_topic", "camera/video").value
-        camera2_topic = self.declare_parameter(
-            "camera2_topic", "camera/d435/color/image_raw"
-        ).value
-
         # 使用 ReentrantCallbackGroup 允许在服务回调中处理图像订阅
         self.cb_group = ReentrantCallbackGroup()
 
         # 创建订阅者
         # 相机话题通常使用 sensor data QoS，避免可靠模式导致丢帧阻塞
-        # 使用 KeepLast(1) 确保获取最新图像，减少延迟
         qos_profile = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
             history=HistoryPolicy.KEEP_LAST,
@@ -74,20 +67,16 @@ class VisionNode(Node):
         )
         # 普通相机
         self.camera1_image_sub = self.create_subscription(
-            Image, camera1_topic, self.camera1_image_callback, qos_profile, callback_group=self.cb_group
+            Image, "camera/video", self.camera1_image_callback, qos_profile, callback_group=self.cb_group
         )
         # 深度相机
         self.camera2_image_sub = self.create_subscription(
-            Image, camera2_topic, self.camera2_image_callback, qos_profile, callback_group=self.cb_group
+            Image, "camera/d435/color/image_raw", self.camera2_image_callback, qos_profile, callback_group=self.cb_group
         )
         self.srv_yolo = self.create_service(YOLO, "yolo_trigger", self.yolo_callback, callback_group=self.cb_group)
         self.srv_ocr = self.create_service(OCR, "ocr_trigger", self.ocr_callback, callback_group=self.cb_group)
 
-        # 交通灯检测参数
-        self.declare_parameter("traffic_light_max_wait", 20.0)
-        self.declare_parameter("traffic_light_poll_interval", 0.5)
-
-        # 初始化YOLO模型 - 支持多模型
+        # 初始化YOLO模型
         self.yolo_model_path_default = config.YOLO_MODEL_PATH
         self.yolo_font_path = config.YOLO_FONT_PATH
         self.yolo_save_dir = "/home/jetson/ros2/AIC_car_2025/vision_node/yolo/result"
@@ -162,7 +151,7 @@ class VisionNode(Node):
         # 验证相机参数
         if camera_mode not in ("camera1", "camera2", "both"):
             response.success = False
-            response.message = f"不支持的 camera 参数: {request.camera}"
+            response.message = f"不支持的camera参数: {request.camera}"
             return response
 
         # 加载指定模型
@@ -187,15 +176,12 @@ class VisionNode(Node):
             return response
 
     def _handle_traffic_light_detection(self, request, response, model, model_path, model_name, camera_mode):
-        """处理交通灯检测 - 循环检测直到出现绿灯或超时"""
-        max_wait = self.get_parameter("traffic_light_max_wait").value
-        poll_interval = self.get_parameter("traffic_light_poll_interval").value
+        """交通灯检测 - 循环直到绿灯或超时"""
+        max_wait = 20.0
+        poll_interval = 0.5
         deadline = time.time() + max_wait
 
         while time.time() < deadline:
-            # 等待0.3s以确保图像稳定，并更新最新图像
-            time.sleep(0.3)
-            
             ts = time.strftime("%Y%m%d-%H%M%S") + f"_{int(time.time() * 1000) % 1000:03d}"
             
             # 获取当前相机图像
@@ -238,9 +224,6 @@ class VisionNode(Node):
 
     def _handle_standard_detection(self, request, response, model, model_path, model_name, camera_mode):
         """处理标准一次性检测"""
-        # 等待0.3s以确保图像稳定，并更新最新图像
-        time.sleep(0.3)
-
         ts = time.strftime("%Y%m%d-%H%M%S")
         
         # 获取相机图像
@@ -327,7 +310,7 @@ class VisionNode(Node):
         detection_results = []
 
         # YOLO检测，输入尺寸960
-        results = model(frame, imgsz=960)  # type: ignore
+        results = model(frame, imgsz=960)
         
         # 准备绘制
         img_pil = PILImage.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
@@ -341,7 +324,7 @@ class VisionNode(Node):
 
         has_detections = False
         
-        # 1. 处理目标检测结果 (Boxes)
+        # 处理目标检测结果 (Boxes)
         if results and results[0].boxes is not None and len(results[0].boxes) > 0:
             has_detections = True
             boxes = results[0].boxes
@@ -357,7 +340,7 @@ class VisionNode(Node):
             for box in boxes:
                 cls_id = int(box.cls)
                 conf = float(box.conf)
-                
+
                 # 优先使用自定义映射
                 if cls_id in self.custom_label_map:
                     label = self.custom_label_map[cls_id]
@@ -490,13 +473,13 @@ class VisionNode(Node):
 
             response.success = True
             if all_ocr_results:
-                response.message = f"OCR识别到{len(all_ocr_results)}条文本。结果: {'; '.join(all_ocr_results)}"
+                response.message = f"OCR识别到{len(all_ocr_results)}条文本。结果:{'; '.join(all_ocr_results)}"
             else:
                 response.message = "OCR未识别到文本"
 
         except Exception as e:
             response.success = False
-            response.message = f"OCR识别失败: {str(e)}"
+            response.message = f"OCR识别失败:{str(e)}"
 
         return response
 
@@ -504,7 +487,6 @@ class VisionNode(Node):
         """处理单张图像的OCR识别"""
         ocr_results = []
 
-        time.sleep(0.5)  # 确保图像稳定
         # OCR识别
         result = self.ocr_engine.ocr(frame, cls=True)
 
@@ -512,14 +494,14 @@ class VisionNode(Node):
             for line in result[0]:
                 text = line[1][0]
                 confidence = line[1][1]
-                result_str = f"[{camera_name}] {text} (置信度: {confidence:.2f})"
+                result_str = f"[{camera_name}] {text} (置信度:{confidence:.2f})"
                 ocr_results.append(result_str)
-                self.get_logger().info(f"识别到文本: {result_str}")
+                self.get_logger().info(f"识别到文本:{result_str}")
 
         # 保存结果图像
         result_path = os.path.join(self.ocr_save_dir, f"{filename_prefix}_result.jpg")
         cv2.imwrite(result_path, frame)
-        self.get_logger().info(f"✅ {camera_name} OCR结果已保存到: {result_path}")
+        self.get_logger().info(f"✅{camera_name}OCR结果已保存到:{result_path}")
 
         return ocr_results
 

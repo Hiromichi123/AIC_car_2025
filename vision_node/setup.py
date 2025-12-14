@@ -30,12 +30,10 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        # 安装OCR字典文件（但实际使用源码目录的文件）
         ('share/' + package_name + '/ocr/ppocr/utils', 
             glob('ocr/ppocr/utils/*.txt')),
-        # 安装YOLO字体文件（但实际使用源码目录的文件）
         ('share/' + package_name + '/yolo',
-            (glob('yolo/*.ttf') + glob('yolo/*.pt')) if os.path.exists('yolo') else []),
+            (glob(' yolo/*.ttf') + glob('yolo/*.pt')) if os.path.exists('yolo') else []),
     ],
     install_requires=['setuptools'],
     zip_safe=False,
