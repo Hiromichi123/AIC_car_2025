@@ -16,6 +16,7 @@ from PIL import ImageFont, ImageDraw, Image as PILImage
 
 from ros2_tools.srv import YOLO
 from ros2_tools.srv import OCR
+from ros2_tools.srv import GarbageClassify
 
 from . import config
 
@@ -75,6 +76,9 @@ class VisionNode(Node):
         )
         self.srv_yolo = self.create_service(YOLO, "yolo_trigger", self.yolo_callback, callback_group=self.cb_group)
         self.srv_ocr = self.create_service(OCR, "ocr_trigger", self.ocr_callback, callback_group=self.cb_group)
+
+        # 创建垃圾分类客户端
+        self.garbage_classify_client = self.create_client(GarbageClassify, 'garbage_classify')
 
         # 初始化YOLO模型
         self.yolo_model_path_default = config.YOLO_MODEL_PATH
@@ -166,6 +170,10 @@ class VisionNode(Node):
             if model_name == "traffic_light":
                 return self._handle_traffic_light_detection(request, response, model, model_path, model_name, camera_mode)
             
+            # 垃圾桶检测 - 检测到后调用 yolip 服务
+            if model_name == "rubbish_bin":
+                return self._handle_rubbish_bin_detection(request, response, model, model_path, model_name, camera_mode)
+            
             # 默认检测
             return self._handle_standard_detection(request, response, model, model_path, model_name, camera_mode)
 
@@ -220,6 +228,77 @@ class VisionNode(Node):
         response.success = False
         response.message = f"等待绿灯超时({max_wait}秒)"
         self.get_logger().warn("⚠️ 绿灯检测超时")
+        return response
+
+    def _handle_rubbish_bin_detection(self, request, response, model, model_path, model_name, camera_mode):
+        """垃圾桶检测 - 检测到垃圾桶后调用yolip服务进行垃圾分类"""
+        ts = time.strftime("%Y%m%d-%H%M%S")
+        
+        # 获取相机图像
+        camera_images = self._get_camera_images(camera_mode)
+        if not camera_images:
+            response.success = False
+            response.message = self._get_missing_camera_message(camera_mode)
+            return response
+
+        # 使用垃圾桶检测模型检测垃圾桶
+        all_results = []
+        for cam_name, frame in camera_images:
+            self.get_logger().info(f"检测垃圾桶 - {cam_name}...")
+            det_results = self._process_yolo_image(
+                frame.copy(),
+                f"{cam_name}_{ts}_rubbish_bin",
+                cam_name,
+                model,
+                model_name,
+                suppress_empty_warn=False,
+                save_result=True,
+                return_frame=False,
+            )
+            all_results.extend(det_results)
+
+        if not all_results:
+            response.success = False
+            response.message = "未检测到垃圾桶"
+            return response
+
+        # 检测到垃圾桶后，调用yolip服务进行垃圾分类
+        self.get_logger().info("检测到垃圾桶，调用yolip服务进行垃圾分类...")
+        
+        # 等待服务可用
+        if not self.garbage_classify_client.wait_for_service(timeout_sec=5.0):
+            response.success = False
+            response.message = f"yolip垃圾分类服务不可用。垃圾桶检测结果: {'; '.join(all_results)}"
+            self.get_logger().error("yolip服务未启动")
+            return response
+
+        # 调用垃圾分类服务
+        classify_request = GarbageClassify.Request()
+        future = self.garbage_classify_client.call_async(classify_request)
+        
+        # 阻塞等待响应
+        rclpy.spin_until_future_complete(self, future, timeout_sec=10.0)
+        
+        if future.result() is not None:
+            classify_response = future.result()
+            if classify_response.success:
+                response.success = True
+                response.message = (
+                    f"垃圾分类完成: [{classify_response.category}] "
+                    f"{classify_response.item_name} "
+                    f"(置信度: {classify_response.confidence:.2f}). "
+                    f"垃圾桶位置: {'; '.join(all_results)}"
+                )
+                self.get_logger().info(f"✅ {response.message}")
+            else:
+                response.success = False
+                response.message = f"垃圾分类失败: {classify_response.message}. 垃圾桶检测: {'; '.join(all_results)}"
+                self.get_logger().warn(f"⚠️ {response.message}")
+        else:
+            response.success = False
+            response.message = f"垃圾分类服务调用超时。垃圾桶检测: {'; '.join(all_results)}"
+            self.get_logger().error("yolip服务调用超时")
+        
         return response
 
     def _handle_standard_detection(self, request, response, model, model_path, model_name, camera_mode):

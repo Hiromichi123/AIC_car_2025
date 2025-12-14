@@ -8,29 +8,21 @@ from collections import deque
 from cv_bridge import CvBridge, CvBridgeError
 from sensor_msgs.msg import Image
 
+from ros2_tools.srv import GarbageClassify
+
 from . import yolo
 from . import clip
 
 class yolip_node(Node):
     def __init__(self):
-        # 动物字典映射
-        self.OBJECT_TYPE_MAPPING = {
-            '大象': 1,
-            '老虎': 2,
-            '狼': 3,
-            '猴子': 4,
-            '孔雀': 5
-        }
-
         super().__init__('yolip_node')
         self.bridge = CvBridge()
 
         # 图像缓存最新3帧
         self.image_cache = deque(maxlen=3)
-        self.odom_msg = None
 
         qos_profile = QoSProfile(
-        reliability=ReliabilityPolicy.RELIABLE,
+            reliability=ReliabilityPolicy.RELIABLE,
             history=HistoryPolicy.KEEP_LAST,
             depth=1
         )
@@ -41,9 +33,16 @@ class yolip_node(Node):
             qos_profile
         )
 
+        # 创建垃圾分类服务
+        self.classify_service = self.create_service(
+            GarbageClassify,
+            'garbage_classify',
+            self.classify_callback
+        )
+
         # 预热
         self.get_logger().info("开始模型预热...")
-        input = np.zeros((960, 960, 3), dtype=np.uint8) # 空图像
+        input = np.zeros((960, 960, 3), dtype=np.uint8)
         yolo.infer_cut(input)
         clip.infer(input)
         self.get_logger().info("yolip_node初始化完成")
@@ -58,58 +57,84 @@ class yolip_node(Node):
         except CvBridgeError as e:
             self.get_logger().error(f"图像转换失败: {e}")
 
-    # 区域触发回调
-    def region_cb(self, msg):
-        if msg.data == 0:
-            return
- 
+    # 垃圾分类服务回调
+    def classify_callback(self, request, response):
+        """垃圾分类服务 - 对最新图像进行 YOLO+CLIP 双重识别"""
+        self.get_logger().info("收到垃圾分类请求...")
+        
         # 检查缓存中是否有图像
         if not self.image_cache:
-            self.get_logger().warn("触发识别但图像缓存为空")
-            return
+            response.success = False
+            response.message = "图像缓存为空，无法进行分类"
+            return response
         
         # 获取最新的图像
         latest_frame = self.image_cache[-1]
         rgb_img = latest_frame.copy()
+        
         try:
-            img_copy = rgb_img.copy()
-            self.classify(rgb_img, img_copy, msg)
-
+            result = self._perform_classification(rgb_img)
+            
+            if result:
+                response.success = True
+                response.category = result['category']
+                response.item_name = result['item_name']
+                response.confidence = float(result['confidence'])
+                response.message = f"识别成功: [{result['category']}] {result['item_name']} (置信度: {result['confidence']:.2f})"
+                self.get_logger().info(response.message)
+            else:
+                response.success = False
+                response.message = "未识别到垃圾物品"
+                response.category = ""
+                response.item_name = ""
+                response.confidence = 0.0
+                
         except Exception as e:
-            self.get_logger().error(f"识别处理异常: {e}")
+            self.get_logger().error(f"分类处理异常: {e}")
+            response.success = False
+            response.message = f"分类失败: {str(e)}"
+            response.category = ""
+            response.item_name = ""
+            response.confidence = 0.0
+        
+        return response
 
-    # 进行双重识别
-    def classify(self, img, img_copy, msg):
-        current_results = yolo.infer_cut(img) # 进行yolo推理
-
-        yolo.draw_all_yolo_boxes(img_copy, current_results) # 绘制yolo矩形框
-
-        #对当前区域的yolo框进行CLIP识别
-        valid_results = []
-        for cut_result in current_results:
+    # 执行分类识别
+    def _perform_classification(self, img):
+        """进行 YOLO+CLIP 双重识别，返回最佳结果"""
+        # YOLO检测
+        yolo_results = yolo.infer_cut(img)
+        
+        if not yolo_results:
+            self.get_logger().warn("YOLO未检测到物体")
+            return None
+        
+        # 对检测到的每个物体进行CLIP分类
+        best_result = None
+        best_confidence = 0.0
+        
+        for cut_result in yolo_results:
             if not cut_result:
                 continue
 
             clip_results = clip.infer(cut_result.square_cut_img)
             
-            probs = {}
-            for clip_result in clip_results:
-                if clip_result.confidence > 0.3:
-                    probs[clip_result.name] = clip_result.confidence
-            if not probs:
+            # 获取最佳CLIP结果
+            clip_best = clip.get_best_result(clip_results, min_confidence=0.3)
+            if not clip_best:
                 continue
-
-            result = max(probs, key=probs.get)
-            confidence = probs[result]
-            center_x, center_y = cut_result.get_center_point()
-            valid_results.append({
-                'cut_result': cut_result,
-                'result': result,
-                'confidence': confidence,
-                'center_x': center_x,
-                'center_y': center_y,
-                'probs': probs
-            })
+            
+            # 保存置信度最高的结果
+            if clip_best.confidence > best_confidence:
+                best_confidence = clip_best.confidence
+                best_result = {
+                    'category': clip_best.category,
+                    'item_name': clip_best.item_name,
+                    'confidence': clip_best.confidence,
+                    'cut_result': cut_result
+                }
+        
+        return best_result
 
 def main(args=None):
     rclpy.init(args=args)

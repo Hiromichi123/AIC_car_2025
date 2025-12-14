@@ -28,6 +28,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/OCR.srv"
   "srv/SERVO.srv"
   "srv/YOLO.srv"
+  "srv/GarbageClassify.srv"
 )
 
 ament_export_dependencies(rosidl_default_runtime rosidl_generator_rs) # 导出 Rust 消息接口

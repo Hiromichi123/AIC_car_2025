@@ -1,0 +1,7 @@
+# 垃圾分类服务
+---
+bool success
+string message
+string category      # 大类（可回收垃圾、有害垃圾等）
+string item_name     # 小类（具体物品名称）
+float32 confidence   # 置信度
