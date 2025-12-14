@@ -4,8 +4,7 @@ import cv2
 import os
 
 # 获取模型文件的绝对路径
-current_dir = os.path.dirname(os.path.abspath(__file__))
-model_path = os.path.join(current_dir, "yolo.pt")
+model_path = os.path.join("/home/jetson/ros2/AIC_car_2025/yolip/yolip/scripts/rubbish.pt")
 model_cut = YOLO(model_path, verbose=False)
 
 class YoloResultObj():
@@ -37,16 +36,6 @@ def infer_cut(img, confidence_threshold: float = 0.5) -> list[YoloResultObj]:
     results = model_cut(img, verbose=False)
     result_list = []
 
-    # 获取图像尺寸和中心区域边界
-    img_height, img_width = img.shape[:2]
-    center_size = img_width // 3  # 三分之一宽度
-    
-    # 中心区域边界
-    left_bound = (img_width - center_size) // 2
-    right_bound = left_bound + center_size
-    top_bound = (img_height - center_size) // 2
-    bottom_bound = top_bound + center_size
-
     boxes = results[0].boxes
     if boxes is None or len(boxes) == 0:
         return result_list
@@ -59,21 +48,14 @@ def infer_cut(img, confidence_threshold: float = 0.5) -> list[YoloResultObj]:
 
         # 过滤掉置信度低于阈值的框
         if confidence >= confidence_threshold:
-            # 计算检测框中心点
-            x1, y1, x2, y2 = box
-            center_x = (x1 + x2) / 2
-            center_y = (y1 + y2) / 2
-            # 判断中心点是否在边界内
-            if (left_bound <= center_x <= right_bound and 
-                top_bound <= center_y <= bottom_bound):
-                r = YoloResultObj(
-                    confidence=confidence,
-                    id=cls_id,
-                    name=name,
-                    square_cut_img=cut_square(img, box),
-                    box=box,
-                )
-                result_list.append(r)
+            r = YoloResultObj(
+                confidence=confidence,
+                id=cls_id,
+                name=name,
+                square_cut_img=cut_square(img, box),
+                box=box,
+            )
+            result_list.append(r)
     return result_list
 
 # 绘制最中心yolo矩形框+置信度

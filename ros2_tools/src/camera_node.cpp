@@ -10,15 +10,6 @@ public:
   GroundCameraNode() : Node("camera_node") {
     camera_pub_ = this->create_publisher<sensor_msgs::msg::Image>("/camera/video", 1);
 
-    preferred_device_ = this->declare_parameter<std::string>("camera_device", "/dev/video0");
-    fallback_devices_ = {
-      preferred_device_,
-      "/dev/video0",
-      "/dev/video1",
-      "/dev/camera0",
-      "/dev/camera1"
-    };
-
     if (!open_first_available()) {
       RCLCPP_ERROR(this->get_logger(), "无法打开任何摄像头，请检查硬件连接");
       rclcpp::shutdown();
@@ -32,23 +23,15 @@ public:
     timer_ = this->create_wall_timer(
         std::chrono::milliseconds(33),
         std::bind(&GroundCameraNode::timer_callback, this));
-    RCLCPP_INFO(this->get_logger(), "Camera node started，设备: %s", active_device_.c_str());
   }
 
 private:
   bool open_first_available() {
-    for (const auto &device : fallback_devices_) {
-      if (device.empty()) {
-        continue;
-      }
-      camera.release();
-      if (camera.open(device, cv::CAP_V4L2)) {
-        active_device_ = device;
-        return true;
-      }
-      RCLCPP_WARN(this->get_logger(), "尝试打开 %s 失败", device.c_str());
+    camera.release();
+    if (camera.open("/dev/camera1", cv::CAP_V4L2)) {
+      return true;
     }
-    active_device_.clear();
+    RCLCPP_WARN(this->get_logger(), "尝试打开 /dev/camera1 失败");
     return false;
   }
 
@@ -81,9 +64,6 @@ private:
   }
 
   cv::VideoCapture camera;
-  std::string preferred_device_;
-  std::vector<std::string> fallback_devices_;
-  std::string active_device_;
 
   cv::Mat frame;
   cv::Mat flipped_frame;

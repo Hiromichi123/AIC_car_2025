@@ -1,4 +1,5 @@
 from setuptools import setup
+import os
 
 package_name = 'yolip'
 
@@ -23,6 +24,7 @@ setup(
         'rclpy',
         'cv_bridge',
         'sensor_msgs',
+        'ros2_tools',
     ],
     zip_safe=True,
     maintainer='Hiromichi123',
