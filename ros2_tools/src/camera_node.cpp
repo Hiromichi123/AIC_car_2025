@@ -15,6 +15,9 @@ public:
       rclcpp::shutdown();
       return;
     }
+    else {
+      RCLCPP_INFO(this->get_logger(), "成功打开摄像头 /dev/camera1");
+    }
 
     camera.set(cv::CAP_PROP_FRAME_WIDTH, 1920);
     camera.set(cv::CAP_PROP_FRAME_HEIGHT, 1080);
