@@ -8,6 +8,7 @@ use ros2_tools::srv::{
 };
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::thread::sleep;
 use std::time::{Duration, Instant};
 
 macro_rules! spin_until_response {

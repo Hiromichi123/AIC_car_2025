@@ -100,12 +100,36 @@ class VisionNode(Node):
             3: (0, 255, 255),   # 绿灯
             4: (255, 255, 0),   # 黄灯
         }
-        self.custom_label_map = {
-            0: "target_1",
-            1: "target_2",
-            2: "红灯",
-            3: "绿灯",
-            4: "黄灯",
+        
+        # Define separate label maps for different models
+        self.model_label_maps = {
+            "traffic_light": {
+                0: "绿灯",
+                1: "红灯",
+                2: "黄灯",
+            },
+            "people_best": {
+                0: "社区人员",
+                1: "非社区人员",
+            },
+            "rubbish_bin_best": {
+                0: "可回收垃圾",
+                1: "有害垃圾",
+                2: "其他垃圾",
+                3: "厨余垃圾",
+            },
+            "e_bike": {
+                0: "停放正确",
+                1: "停放不正确",
+                2: "倒伏",
+            },
+            "default": {
+                0: "target_1",
+                1: "target_2",
+                2: "红灯",
+                3: "绿灯",
+                4: "黄灯",
+            }
         }
 
         # 初始化PaddleOCR
@@ -315,10 +339,10 @@ class VisionNode(Node):
         # 执行检测
         all_results = []
         for cam_name, frame in camera_images:
-            self.get_logger().info(f"处理{cam_name}图像... 使用模型: {model_path}")
+            self.get_logger().info(f"处理{cam_name}图像... 使用模型: {model_name}")
             det_results = self._process_yolo_image(
                 frame.copy(),
-                f"{cam_name}_{ts}",
+                f"{cam_name}_{ts}_{model_name}",  # Add model name to filename
                 cam_name,
                 model,
                 model_name,
@@ -415,14 +439,17 @@ class VisionNode(Node):
             label_map = model_config.get("labels", {})
             color_map = model_config.get("colors", {})
 
+            # 获取自定义映射
+            custom_map = self.model_label_maps.get(model_name)
+
             # 处理每个检测框
             for box in boxes:
                 cls_id = int(box.cls)
                 conf = float(box.conf)
 
                 # 优先使用自定义映射
-                if cls_id in self.custom_label_map:
-                    label = self.custom_label_map[cls_id]
+                if custom_map and cls_id in custom_map:
+                    label = custom_map[cls_id]
                     color = self.custom_color_map.get(cls_id, (255, 255, 255))
                 else:
                     label = label_map.get(cls_id, f"未知类别({cls_id})")
@@ -449,17 +476,11 @@ class VisionNode(Node):
             top1_index = int(probs.top1)
             conf = float(probs.top1conf)
             
-            # 获取类别名称
-            label = results[0].names[top1_index] if results[0].names else str(top1_index)
+            # 获取对应的label_map
+            label_map = self.model_label_maps.get(model_name, self.model_label_maps["default"])
             
-            # 映射英文标签到中文，以便后续逻辑判断
-            display_label = label
-            if "green" in label.lower():
-                display_label = "绿灯"
-            elif "red" in label.lower():
-                display_label = "红灯"
-            elif "yellow" in label.lower():
-                display_label = "黄灯"
+            # 获取中文标签
+            display_label = label_map.get(top1_index, f"未知类别({top1_index})")
             
             result_str = f"[{camera_name}] {display_label} (置信度: {conf:.2f})"
             detection_results.append(result_str)
