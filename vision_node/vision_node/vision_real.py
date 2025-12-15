@@ -68,11 +68,11 @@ class VisionNode(Node):
         )
         # 普通相机
         self.camera1_image_sub = self.create_subscription(
-            Image, "camera/video", self.camera1_image_callback, qos_profile, callback_group=self.cb_group
+            Image, "/camera/video", self.camera1_image_callback, qos_profile, callback_group=self.cb_group
         )
         # 深度相机
         self.camera2_image_sub = self.create_subscription(
-            Image, "camera/d435/color/image_raw", self.camera2_image_callback, qos_profile, callback_group=self.cb_group
+            Image, "/camera/d435/color/image_raw", self.camera2_image_callback, qos_profile, callback_group=self.cb_group
         )
         self.srv_yolo = self.create_service(YOLO, "yolo_trigger", self.yolo_callback, callback_group=self.cb_group)
         self.srv_ocr = self.create_service(OCR, "ocr_trigger", self.ocr_callback, callback_group=self.cb_group)

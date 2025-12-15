@@ -21,16 +21,15 @@ class yolip_node(Node):
         # 图像缓存最新3帧
         self.image_cache = deque(maxlen=3)
 
-        qos_profile = QoSProfile(
-            reliability=ReliabilityPolicy.RELIABLE,
-            history=HistoryPolicy.KEEP_LAST,
-            depth=1
-        )
         self.rgb_subscription = self.create_subscription(
             Image,
-            '/camera/camera/color/image_raw',
+            '/camera/video',
             self.rgb_cb,
-            qos_profile
+            QoSProfile(
+                reliability=ReliabilityPolicy.RELIABLE,
+                history=HistoryPolicy.KEEP_LAST,
+                depth=1
+            )
         )
 
         # 创建垃圾分类服务
@@ -59,13 +58,14 @@ class yolip_node(Node):
 
     # 垃圾分类服务回调
     def classify_callback(self, request, response):
-        """垃圾分类服务 - 对最新图像进行 YOLO+CLIP 双重识别"""
+        """垃圾分类服务 - 对camera1进行 YOLO+CLIP 双重识别"""
         self.get_logger().info("收到垃圾分类请求...")
         
         # 检查缓存中是否有图像
         if not self.image_cache:
             response.success = False
-            response.message = "图像缓存为空，无法进行分类"
+            response.message = "false"
+            self.get_logger().error("图像缓存为空，无法进行分类")
             return response
         
         # 获取最新的图像
@@ -102,8 +102,7 @@ class yolip_node(Node):
     # 执行分类识别
     def _perform_classification(self, img):
         """进行 YOLO+CLIP 双重识别，返回最佳结果"""
-        # YOLO检测
-        yolo_results = yolo.infer_cut(img)
+        yolo_results = yolo.infer_cut(img) # YOLO检测
         
         if not yolo_results:
             self.get_logger().warn("YOLO未检测到物体")
