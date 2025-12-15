@@ -18,11 +18,19 @@ macro_rules! spin_tick {
 macro_rules! set_and_wait {
     ($node:expr, $wps:expr, $trans_th:expr, $rot_th:expr, $exec:expr, $log:literal) => {{
         $node.set_destinations($wps, $trans_th, $rot_th)?;
+        let start_time = std::time::Instant::now();
+        let timeout = std::time::Duration::from_secs(5);
+        
         loop {
             spin_tick!($exec);
 
             if $node.is_arrived() {
                 log_info!("navi_main", $log);
+                break;
+            }
+            
+            if start_time.elapsed() > timeout {
+                log_info!("navi_main", "⚠️导航超时 5s，继续动作...");
                 break;
             }
         }
@@ -108,7 +116,7 @@ fn main() -> anyhow::Result<()> {
 
     match navi_node.call_yolo_blocking(
         &mut executor,
-        Some("people_best"),
+        Some("people"),
         Some("camera1"),
         Duration::from_secs_f32(2.0),
     ) {
@@ -146,7 +154,7 @@ fn main() -> anyhow::Result<()> {
 
     match navi_node.call_yolo_blocking(
         &mut executor,
-        Some("people_best"),
+        Some("people"),
         Some("camera2"),
         Duration::from_secs_f32(2.0),
     ) {
@@ -184,7 +192,7 @@ fn main() -> anyhow::Result<()> {
 
     match navi_node.call_yolo_blocking(
         &mut executor,
-        Some("people_best"),
+        Some("people"),
         Some("camera1"),
         Duration::from_secs_f32(2.0),
     ) {
@@ -208,7 +216,7 @@ fn main() -> anyhow::Result<()> {
 
     match navi_node.call_yolo_blocking(
         &mut executor,
-        Some("people_best"),
+        Some("people"),
         Some("camera1"),
         Duration::from_secs_f32(2.0),
     ) {
@@ -265,7 +273,7 @@ fn main() -> anyhow::Result<()> {
 
     match navi_node.call_yolo_blocking(
         &mut executor,
-        Some("people_best"),
+        Some("people"),
         Some("camera1"),
         Duration::from_secs_f32(2.0),
     ) {
@@ -377,7 +385,7 @@ fn main() -> anyhow::Result<()> {
 
     match navi_node.call_yolo_blocking(
         &mut executor,
-        Some("rubbish_bin_best"),
+        Some("rubbish_bin"),
         Some("camera1"),
         Duration::from_secs_f32(2.0),
     ) {

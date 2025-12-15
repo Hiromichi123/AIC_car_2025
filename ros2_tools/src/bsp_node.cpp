@@ -14,12 +14,12 @@ class PositionController : public rclcpp::Node {
 public:
     PositionController()
     : Node("bsp_node"),
-      Kp_linear_(declare_parameter("kp_linear", 1.5)),
-      Ki_linear_(declare_parameter("ki_linear", 0.02)),
-      Kd_linear_(declare_parameter("kd_linear", 0.02)),
+      Kp_linear_(declare_parameter("kp_linear", 2.0)),
+      Ki_linear_(declare_parameter("ki_linear", 0.03)),
+      Kd_linear_(declare_parameter("kd_linear", 0.03)),
       Kp_angular_(declare_parameter("kp_angular", 3.0)),
-      Ki_angular_(declare_parameter("ki_angular", 0.02)),
-      Kd_angular_(declare_parameter("kd_angular", 0.02)),
+      Ki_angular_(declare_parameter("ki_angular", 0.03)),
+      Kd_angular_(declare_parameter("kd_angular", 0.03)),
       position_threshold_(declare_parameter("position_threshold", 0.00)),
       angle_threshold_(declare_parameter("angle_threshold", 0.03)),
       rotation_first_threshold_(declare_parameter("rotation_first_threshold", 0.2))
@@ -54,17 +54,17 @@ private:
       target_yaw_ = extractYawFromQuaternion(q);
       has_target_yaw_ = true;
       rotating_first_ = true;
-      RCLCPP_INFO(this->get_logger(),
-                  "Goal with orientation: pos(%.2f, %.2f), yaw=%.1f°",
-                  msg->pose.position.x, msg->pose.position.y,
-                  target_yaw_ * 180.0 / M_PI);
+      // RCLCPP_INFO(this->get_logger(),
+      //             "Goal with orientation: pos(%.2f, %.2f), yaw=%.1f°",
+      //             msg->pose.position.x, msg->pose.position.y,
+      //             target_yaw_ * 180.0 / M_PI);
     } else {
       // 无目标朝向
       has_target_yaw_ = false;
       rotating_first_ = false;
-      RCLCPP_INFO(this->get_logger(),
-                  "Goal without orientation: pos(%.2f, %.2f)",
-                  msg->pose.position.x, msg->pose.position.y);
+      // RCLCPP_INFO(this->get_logger(),
+      //             "Goal without orientation: pos(%.2f, %.2f)",
+      //             msg->pose.position.x, msg->pose.position.y);
     }
 
     computeAndPublish();
@@ -105,9 +105,9 @@ private:
           // 需要调整角度
           cmd.angular.z = Kp_angular_ * yaw_error;
           cmd_pub_->publish(cmd);
-          RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 500,
-                               "Position reached, adjusting angle: %.1f° to go",
-                               yaw_error * 180.0 / M_PI);
+          // RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 500,
+          //                      "Position reached, adjusting angle: %.1f° to go",
+          //                      yaw_error * 180.0 / M_PI);
           return;
         }
       }
@@ -116,7 +116,7 @@ private:
       cmd_pub_->publish(cmd);
       has_goal_ = false;
       first_update_ = true;
-      RCLCPP_INFO(this->get_logger(), "Goal fully reached!");
+      //RCLCPP_INFO(this->get_logger(), "Goal fully reached!");
       return;
     }
 
@@ -133,14 +133,14 @@ private:
         cmd.angular.z = Kp_angular_ * yaw_error;
         cmd.angular.z += Ki_angular_ * integral_yaw_ + Kd_angular_ * deriv_yaw;
         cmd_pub_->publish(cmd);
-        RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 500,
-                             "Rotating first: %.1f° to go",
-                             yaw_error * 180.0 / M_PI);
+        // RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 500,
+        //                      "Rotating first: %.1f° to go",
+        //                      yaw_error * 180.0 / M_PI);
         return;
       } else {
         // 转向完成，开始移动
         rotating_first_ = false;
-        RCLCPP_INFO(this->get_logger(), "Rotation complete, starting movement");
+        //RCLCPP_INFO(this->get_logger(), "Rotation complete, starting movement");
       }
     }
 
@@ -197,9 +197,9 @@ private:
 
     cmd_pub_->publish(cmd);
 
-    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
-                         "Distance: %.2fm, vx=%.2f, vy=%.2f, ω=%.2f", distance,
-                         cmd.linear.x, cmd.linear.y, cmd.angular.z);
+    // RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+    //                      "Distance: %.2fm, vx=%.2f, vy=%.2f, ω=%.2f", distance,
+    //                      cmd.linear.x, cmd.linear.y, cmd.angular.z);
   }
 
   // 角度归一化
