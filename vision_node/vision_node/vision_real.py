@@ -92,43 +92,50 @@ class VisionNode(Node):
         # YOLO模型标签配置 - 按模型名称分类
         self.yolo_labels_config = config.YOLO_LABELS
 
-        # Custom maps
+        # 颜色映射
         self.custom_color_map = {
-            0: (255, 0, 0),     # 社区/人类类目 1
-            1: (0, 255, 0),     # 社区/人类类目 2
-            2: (0, 0, 255),     # 红灯
-            3: (0, 255, 255),   # 绿灯
-            4: (255, 255, 0),   # 黄灯
+            0: (255, 0, 0),     # 蓝
+            1: (0, 255, 0),     # 绿
+            2: (0, 0, 255),     # 红
+            3: (255, 255, 0),   # 黄
+            4: (255, 0, 255),   # 紫
+            5: (0, 255, 255),   # 青
+            6: (0, 0, 0),       # 黑
+            7: (255, 255, 255), # 白
         }
         
-        # Define separate label maps for different models
+        # 模型类别到中文标签映射
         self.model_label_maps = {
             "traffic_light": {
-                0: "绿灯",
-                1: "红灯",
-                2: "黄灯",
+                0: "green", # 绿灯
+                1: "red", # 红灯
+                2: "yellow", # 黄灯
             },
-            "people_best": {
-                0: "社区人员",
-                1: "非社区人员",
+            "people": {
+                0: "bad", # 非社区人员
+                1: "good", # 社区人员
             },
-            "rubbish_bin_best": {
-                0: "可回收垃圾",
-                1: "有害垃圾",
-                2: "其他垃圾",
-                3: "厨余垃圾",
+            "rubbish_bin": {
+                0: "harm_close",    # 有害关
+                1: "harm_open",     # 有害开
+                2: "food_close",    # 厨余关
+                3: "food_open",     # 厨余开
+                4: "other_close",   # 其他关
+                5: "other_open",    # 其他开
+                6: "recycle_close", # 可回收关
+                7: "recycle_open",  # 可回收开
             },
             "e_bike": {
-                0: "停放正确",
-                1: "停放不正确",
-                2: "倒伏",
+                0: "fall",      # 倒伏
+                1: "correct",   # 正常
+                2: "incorrect", # 违停
             },
             "default": {
                 0: "target_1",
                 1: "target_2",
-                2: "红灯",
-                3: "绿灯",
-                4: "黄灯",
+                2: "target_3",
+                3: "target_4",
+                4: "target_5",
             }
         }
 

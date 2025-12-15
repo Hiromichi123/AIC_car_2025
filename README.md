@@ -63,15 +63,20 @@ ros2 launch ros2_tools tools_real.launch.py
 
 # 启动视觉节点
 ros2 run vision_node vision_real
+ros2 run yolip yolip
 
 # 启动导航
 ros2 run navi_rs navi_rs
 ```
 
-#### 一键启动所有（实机）
+#### 三键启动所有（实机）
 
 ```bash
 ros2 launch robot_real all.launch.py
+
+ros2 run yolip yolip
+
+ros2 run navi_rs navi_rs
 ```
 
 ## Serial Protocol
