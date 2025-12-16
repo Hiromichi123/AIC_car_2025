@@ -83,6 +83,14 @@ def generate_launch_description():
         output='screen',
     )
 
+    # tts节点
+    tts_node = Node(
+        package='tts',
+        executable='tts_node',
+        name='tts_node',
+        output='screen',
+    )
+
     return LaunchDescription([
         serial_port_arg,
         baud_rate_arg,
@@ -92,4 +100,5 @@ def generate_launch_description():
         d435_node,
         camera_node,
         pwm_node,
+        tts_node,
     ])
