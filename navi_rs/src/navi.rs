@@ -10,6 +10,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
+use std_msgs::msg::String as RosString;
 
 macro_rules! spin_until_response {
     ($executor:expr, $promise:expr, $timeout:expr, $svc:literal) => {{
@@ -71,6 +72,7 @@ pub struct NaviSubNode {
     #[allow(unused)]
     pub navi_instance: Arc<Mutex<Navi>>,
     goal_publisher: Publisher<PoseStamped>,
+    tts_publisher: Publisher<RosString>,
     yolo_client: Arc<Client<YOLO>>,
     ocr_client: Arc<Client<OCR>>,
     servo_client: Arc<Client<SERVO>>,
@@ -239,6 +241,7 @@ impl NaviSubNode {
         let worker = node.create_worker(LidarPose::default());
 
         let goal_publisher = node.create_publisher::<PoseStamped>("/goal")?;
+        let tts_publisher = node.create_publisher::<RosString>("tts_input")?;
         let goal_pub_clone = goal_publisher.clone();
 
         let yolo_client = node.create_client::<YOLO>("yolo_trigger")?;
@@ -270,6 +273,7 @@ impl NaviSubNode {
         Ok(NaviSubNode {
             navi_instance,
             goal_publisher,
+            tts_publisher,
             yolo_client: Arc::new(yolo_client),
             ocr_client: Arc::new(ocr_client),
             servo_client: Arc::new(servo_client),
@@ -463,5 +467,15 @@ impl NaviSubNode {
         } else {
             Err(anyhow::anyhow!("Failed to acquire navigation lock"))
         }
+    }
+
+    /// 发布 TTS 文本到 `tts_input` 话题
+    pub fn publish_tts(&self, text: &str) -> anyhow::Result<()> {
+        let mut msg = RosString::default();
+        msg.data = text.to_string();
+        sleep(std::time::Duration::from_secs_f32(2.0));
+        self.tts_publisher
+            .publish(msg)
+            .map_err(|e| anyhow::anyhow!("Failed to publish TTS message: {:?}", e))
     }
 }

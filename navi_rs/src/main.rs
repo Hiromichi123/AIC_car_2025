@@ -20,7 +20,7 @@ macro_rules! set_and_wait {
         $node.set_destinations($wps, $trans_th, $rot_th)?;
         let start_time = std::time::Instant::now();
         let timeout = std::time::Duration::from_secs(5);
-        
+
         loop {
             spin_tick!($exec);
 
@@ -28,7 +28,7 @@ macro_rules! set_and_wait {
                 log_info!("navi_main", $log);
                 break;
             }
-            
+
             if start_time.elapsed() > timeout {
                 log_info!("navi_main", "⚠️导航超时 5s，继续动作...");
                 break;
@@ -64,6 +64,9 @@ fn main() -> anyhow::Result<()> {
         executor,
         "First Camera point reached! Stopping navigation..."
     );
+
+    navi_node.publish_tts("gogogo出发咯")?;
+    spin_tick!(executor);
 
     // 循环检测交通灯，直到检测到绿灯
     log_info!("navi_main", "Waiting for green light...");
@@ -244,6 +247,30 @@ fn main() -> anyhow::Result<()> {
             );
         }
     }
+
+    navi_node.publish_tts("ero发现")?;
+    spin_tick!(executor);
+
+    match navi_node.call_yolo_blocking(
+        &mut executor,
+        Some("fire"),
+        Some("camera2"),
+        Duration::from_secs_f32(2.0),
+    ) {
+        Ok(yolo_response) => {
+            println!("yolo: {:?}", yolo_response.message);
+        }
+        Err(err) => {
+            log_info!(
+                "navi_main",
+                "YOLO service unavailable or timed out, continuing without detection: {:?}",
+                err
+            );
+        }
+    }
+
+    navi_node.publish_tts("晨光大厦")?;
+    spin_tick!(executor);
 
     let waypoints = vec![
         Pos {
