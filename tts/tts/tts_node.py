@@ -4,12 +4,12 @@ os.environ["HF_HUB_OFFLINE"] = "1" # 强制禁止联网
 
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import String
 
-import threading
-import queue
+from threading import Lock
 import sounddevice as sd
 import scipy.signal 
+
+from ros2_tools.srv import TTS
 
 # 引入 kokoro (index-tts)
 # 如果你无法直接 import kokoro，请确保该库在你的 PYTHONPATH 中
@@ -31,7 +31,7 @@ class IndexTTSNode(Node):
 
         # --- 新增：音频设备参数 ---
         # 默认留空，使用系统默认设备；如果指定字符串，则尝试匹配
-        self.declare_parameter('device', 'hw:2,0') 
+        self.declare_parameter('device', 'USB Audio') 
         
         self.output_device = self.get_parameter('device').value
         
@@ -64,72 +64,53 @@ class IndexTTSNode(Node):
         
         self.get_logger().info("Model loaded successfully.")
 
-        # 3. 创建队列和工作线程
-        # 使用队列是为了避免 TTS 生成阻塞 ROS 的回调循环
-        self.text_queue = queue.Queue()
-        self.worker_thread = threading.Thread(target=self._worker_loop, daemon=True)
-        self.worker_thread.start()
+        # 3. 创建服务锁与服务端，确保同一时间只播放一个请求
+        self._play_lock = Lock()
+        self.tts_service = self.create_service(TTS, 'tts_play', self.handle_tts_request)
+        self.get_logger().info("TTS service 'tts_play' ready (blocking mode)")
+    def synthesize_and_play(self, text: str):
+        self.get_logger().info(f"Synthesizing: {text}")
 
-        # 4. 创建订阅者
-        self.subscription = self.create_subscription(
-            String,
-            'tts_input',  # 订阅的话题名称
-            self.listener_callback,
-            10
+        generator = self.pipeline(
+            text,
+            voice=self.voice,
+            speed=self.speed,
+            split_pattern=r'\n+',
         )
-        self.get_logger().info(f"Subscribed to topic: 'tts_input'")
 
-    def listener_callback(self, msg):
-        """ROS 回调：只负责接收文本并推入队列"""
-        text = msg.data.strip()
-        if text:
-            self.get_logger().info(f"Received text: '{text}'")
-            self.text_queue.put(text)
-
-    def _worker_loop(self):
-        """后台线程：负责从队列取数据、推理、播放"""
-        while rclpy.ok():
-            try:
-                # 阻塞等待新文本，超时是为了定期检查线程是否需要退出
-                text = self.text_queue.get(timeout=1.0) 
-            except queue.Empty:
+        for _, _, audio in generator:
+            if audio is None or len(audio) == 0:
                 continue
 
-            try:
-                self.get_logger().info(f"Synthesizing: {text}")
-                
-                # --- Index-TTS (Kokoro) 推理核心 ---
-                # pipeline 返回一个生成器，包含 (graphemes, phonemes, audio)
-                generator = self.pipeline(
-                    text, 
-                    voice=self.voice, 
-                    speed=self.speed, 
-                    split_pattern=r'\n+'
-                )
+            target_rate = 48000
+            if self.sample_rate != target_rate:
+                num_samples = int(len(audio) * target_rate / self.sample_rate)
+                audio = scipy.signal.resample(audio, num_samples)
 
-                # 遍历生成器播放每一段音频
-                for i, (gs, ps, audio) in enumerate(generator):
-                    if audio is None or len(audio) == 0:
-                        continue
-                    
-                    # --- 新增：重采样逻辑 ---
-                    target_rate = 48000 # 也就是声卡通常支持的 48kHz
-                    if self.sample_rate != target_rate:
-                        # 计算新的采样点数
-                        num_samples = int(len(audio) * target_rate / self.sample_rate)
-                        # 执行重采样
-                        audio = scipy.signal.resample(audio, num_samples)
-                    
-                    # --- 播放 ---
-                    # 注意：这里传入 target_rate (48000) 而不是 self.sample_rate
-                    sd.play(audio, target_rate, device=self.output_device, blocking=True)
-                
-                self.get_logger().info("Playback finished.")
+            sd.play(audio, target_rate, device=self.output_device, blocking=True)
 
-            except Exception as e:
-                self.get_logger().error(f"Error during synthesis/playback: {e}")
-            finally:
-                self.text_queue.task_done()
+        self.get_logger().info("Playback finished.")
+
+    def handle_tts_request(self, request, response):
+        text = request.text.strip()
+        if not text:
+            response.success = False
+            response.message = "Empty text requested"
+            return response
+
+        self._play_lock.acquire()
+        try:
+            self.synthesize_and_play(text)
+            response.success = True
+            response.message = "Playback finished"
+        except Exception as exc:
+            self.get_logger().error(f"Error during synthesis/playback: {exc}")
+            response.success = False
+            response.message = str(exc)
+        finally:
+            self._play_lock.release()
+
+        return response
 
 def main(args=None):
     rclpy.init(args=args)

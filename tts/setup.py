@@ -24,7 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'tts_node = tts.tts.tts_node:main',
+            'tts_node = tts.tts_node:main',
         ],
     },
 )

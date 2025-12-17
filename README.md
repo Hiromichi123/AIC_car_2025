@@ -69,14 +69,10 @@ ros2 run yolip yolip
 ros2 run navi_rs navi_rs
 ```
 
-#### 三键启动所有（实机）
+#### 启动所有（实机）
 
 ```bash
-ros2 launch robot_real all.launch.py
-
-ros2 run yolip yolip
-
-ros2 run navi_rs navi_rs
+make launch
 ```
 
 ## Serial Protocol

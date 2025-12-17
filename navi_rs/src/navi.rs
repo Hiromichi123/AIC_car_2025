@@ -3,14 +3,13 @@ use rclrs::{log_info, Client, Publisher};
 use rclrs::{SubscriptionState, WorkerState};
 use ros2_tools::msg::LidarPose;
 use ros2_tools::srv::{
-    OCR_Request, OCR_Response, SERVO_Request, SERVO_Response, YOLO_Request, YOLO_Response, OCR,
-    SERVO, YOLO,
+    OCR_Request, OCR_Response, SERVO_Request, SERVO_Response, TTS_Request, TTS_Response,
+    YOLO_Request, YOLO_Response, OCR, SERVO, TTS, YOLO,
 };
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
-use std_msgs::msg::String as RosString;
 
 macro_rules! spin_until_response {
     ($executor:expr, $promise:expr, $timeout:expr, $svc:literal) => {{
@@ -61,7 +60,6 @@ pub enum ServoState {
 pub struct Navi {
     pub dest_pos: Vec<Pos>,
     pub current_pos: Pos,
-    pub velocity: Pos,
     pub is_arrived: bool,
     translation_threshold: f64,
     rotation_threshold: f64,
@@ -72,7 +70,7 @@ pub struct NaviSubNode {
     #[allow(unused)]
     pub navi_instance: Arc<Mutex<Navi>>,
     goal_publisher: Publisher<PoseStamped>,
-    tts_publisher: Publisher<RosString>,
+    tts_client: Arc<Client<TTS>>,
     yolo_client: Arc<Client<YOLO>>,
     ocr_client: Arc<Client<OCR>>,
     servo_client: Arc<Client<SERVO>>,
@@ -160,9 +158,9 @@ impl Navi {
             Some(pos) => pos,
             None => {
                 if self.dest_pos.is_empty() {
-                    log_info!("navi update", "no destinations set");
+                    // log_info!("navi update", "no destinations set");
                 } else {
-                    log_info!("navi update", "all waypoints reached");
+                    // log_info!("navi update", "all waypoints reached");
                     self.is_arrived = true;
                 }
                 return None;
@@ -184,53 +182,28 @@ impl Navi {
             if self.current_waypoint_index >= self.dest_pos.len() {
                 // 所有点都到达了
                 self.is_arrived = true;
-                log_info!(
-                    "pos update",
-                    "reached final waypoint! Total: {}",
-                    self.dest_pos.len()
-                );
+                // log_info!(
+                //     "pos update",
+                //     "reached final waypoint! Total: {}",
+                //     self.dest_pos.len()
+                // );
                 return Some(true);
             } else {
                 // 到达当前点，继续下一个
-                log_info!(
-                    "pos update",
-                    "reached waypoint {}/{}, moving to next",
-                    self.current_waypoint_index,
-                    self.dest_pos.len()
-                );
                 return Some(false);
             }
         } else {
-            log_info!(
-                "pos update",
-                "waypoint {}/{}, trans: {:.2}m (threshold: {:.2}), rot: {:.2}rad (threshold: {:.2})",
-                self.current_waypoint_index + 1,
-                self.dest_pos.len(),
-                translation_distance,
-                self.translation_threshold,
-                rotation_distance,
-                self.rotation_threshold
-            );
+            // log_info!(
+            //     "pos update",
+            //     "waypoint {}/{}, trans: {:.2}m (threshold: {:.2}), rot: {:.2}rad (threshold: {:.2})",
+            //     self.current_waypoint_index + 1,
+            //     self.dest_pos.len(),
+            //     translation_distance,
+            //     self.translation_threshold,
+            //     rotation_distance,
+            //     self.rotation_threshold
+            // );
             return Some(false);
-        }
-    }
-
-    /// 清除所有目标点
-    pub fn clear_destinations(&mut self) {
-        self.dest_pos.clear();
-        self.current_waypoint_index = 0;
-        self.is_arrived = false;
-        log_info!("clear destinations", "all destinations cleared");
-    }
-
-    /// 获取剩余路径点数量
-    pub fn remaining_waypoints(&self) -> usize {
-        if self.dest_pos.is_empty() {
-            0
-        } else {
-            self.dest_pos
-                .len()
-                .saturating_sub(self.current_waypoint_index)
         }
     }
 }
@@ -241,19 +214,19 @@ impl NaviSubNode {
         let worker = node.create_worker(LidarPose::default());
 
         let goal_publisher = node.create_publisher::<PoseStamped>("/goal")?;
-        let tts_publisher = node.create_publisher::<RosString>("tts_input")?;
         let goal_pub_clone = goal_publisher.clone();
 
         let yolo_client = node.create_client::<YOLO>("yolo_trigger")?;
         let ocr_client = node.create_client::<OCR>("ocr_trigger")?;
         let servo_client = node.create_client::<SERVO>("servo_control")?;
+        let tts_client = node.create_client::<TTS>("tts_play")?;
 
         let navi_instance = Arc::new(Mutex::new(Navi::new()));
         let navi_instance_clone = Arc::clone(&navi_instance);
 
         let _subscription =
             worker.create_subscription::<LidarPose, _>(topic, move |msg: LidarPose| {
-                log_info!("navi worker", "received lidar pos: {:?}", msg);
+                // log_info!("navi worker", "received lidar pos: {:?}", msg);
                 if let Ok(mut navi) = navi_instance_clone.lock() {
                     match navi.update(msg.into()) {
                         Some(true) => {
@@ -273,7 +246,7 @@ impl NaviSubNode {
         Ok(NaviSubNode {
             navi_instance,
             goal_publisher,
-            tts_publisher,
+            tts_client: Arc::new(tts_client),
             yolo_client: Arc::new(yolo_client),
             ocr_client: Arc::new(ocr_client),
             servo_client: Arc::new(servo_client),
@@ -400,25 +373,17 @@ impl NaviSubNode {
         goal_msg.pose.orientation.z = qz;
 
         publisher.publish(goal_msg)?;
-        log_info!(
-            "navi",
-            "Published goal {}/{}: ({:.2}, {:.2}, yaw: {:.2})",
-            navi.current_waypoint_index + 1,
-            navi.dest_pos.len(),
-            x,
-            y,
-            yaw
-        );
+        // log_info!(
+        //     "navi",
+        //     "Published goal {}/{}: ({:.2}, {:.2}, yaw: {:.2})",
+        //     navi.current_waypoint_index + 1,
+        //     navi.dest_pos.len(),
+        //     x,
+        //     y,
+        //     yaw
+        // );
 
         Ok(())
-    }
-
-    pub fn publish_goal(&self) -> anyhow::Result<()> {
-        if let Ok(navi) = self.navi_instance.lock() {
-            Self::publish_goal_with(&self.goal_publisher, &*navi)
-        } else {
-            Err(anyhow::anyhow!("Failed to acquire navigation lock"))
-        }
     }
 
     /// 设置导航目标点列表
@@ -446,36 +411,30 @@ impl NaviSubNode {
             .unwrap_or(false)
     }
 
-    /// 获取当前位置
-    pub fn get_current_position(&self) -> Option<Pos> {
-        self.navi_instance.lock().ok().map(|navi| navi.current_pos)
-    }
+    /// 阻塞调用 TTS 服务
+    pub fn call_tts_blocking(
+        &self,
+        executor: &mut rclrs::Executor,
+        text: &str,
+        timeout: Duration,
+    ) -> anyhow::Result<TTS_Response> {
+        log_info!("navi", "Calling TTS service (blocking)...");
 
-    /// 获取剩余路径点数量
-    pub fn remaining_waypoints(&self) -> usize {
-        self.navi_instance
-            .lock()
-            .map(|navi| navi.remaining_waypoints())
-            .unwrap_or(0)
-    }
+        let mut request = TTS_Request::default();
+        request.text = text.to_string();
 
-    /// 清除所有目标点
-    pub fn clear_destinations(&self) -> anyhow::Result<()> {
-        if let Ok(mut navi) = self.navi_instance.lock() {
-            navi.clear_destinations();
-            Ok(())
-        } else {
-            Err(anyhow::anyhow!("Failed to acquire navigation lock"))
-        }
-    }
+        let mut promise = self
+            .tts_client
+            .call(&request)
+            .map_err(|e| anyhow::anyhow!("TTS service call failed: {:?}", e))?;
+        let response: TTS_Response = spin_until_response!(executor, promise, timeout, "TTS")?;
 
-    /// 发布 TTS 文本到 `tts_input` 话题
-    pub fn publish_tts(&self, text: &str) -> anyhow::Result<()> {
-        let mut msg = RosString::default();
-        msg.data = text.to_string();
-        sleep(std::time::Duration::from_secs_f32(2.0));
-        self.tts_publisher
-            .publish(msg)
-            .map_err(|e| anyhow::anyhow!("Failed to publish TTS message: {:?}", e))
+        log_info!(
+            "navi",
+            "TTS response - success: {}, message: {}",
+            response.success,
+            response.message
+        );
+        Ok(response)
     }
 }

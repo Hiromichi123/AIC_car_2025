@@ -1,9 +1,11 @@
 use rclrs::{log_info, CreateBasicExecutor, SpinOptions};
 use std::{thread::sleep, time::Duration};
 
-use crate::navi::{CoordUnit, Pos, ServoState};
+mod navi;
+mod vision;
 
-pub mod navi;
+use crate::navi::{CoordUnit, Pos, ServoState};
+use crate::vision::{VisionCategory, VisionRequest, VisionResult};
 
 macro_rules! spin_tick {
     ($exec:expr) => {{
@@ -43,6 +45,13 @@ fn main() -> anyhow::Result<()> {
 
     log_info!("navi_main", "starting navigator...");
     let navi_node = navi::NaviSubNode::new(&executor, "navigator", "lidar_data")?;
+    let mut vision_result = VisionResult::new();
+
+    navi_node.call_tts_blocking(
+        &mut executor,
+        "语音合成网络初始化成功",
+        Duration::from_secs(10),
+    )?;
 
     // 先把舵机复位到中位，避免上电姿态不一致
     if let Err(err) =
@@ -65,36 +74,14 @@ fn main() -> anyhow::Result<()> {
         "First Camera point reached! Stopping navigation..."
     );
 
-    navi_node.publish_tts("gogogo出发咯")?;
-    spin_tick!(executor);
-
     // 循环检测交通灯，直到检测到绿灯
-    log_info!("navi_main", "Waiting for green light...");
-    match navi_node.call_yolo_blocking(
+    vision::wait_for_green_light(
+        &navi_node,
         &mut executor,
-        Some("traffic_light"),
-        Some("camera1"),
         Duration::from_secs_f32(2.0),
-    ) {
-        Ok(yolo_response) => {
-            log_info!(
-                "navi_main",
-                "Traffic light detection: {:?}",
-                yolo_response.message
-            );
-            // 检查响应中是否包含"绿灯"
-            if yolo_response.message.contains("绿灯") {
-                log_info!("navi_main", "Green light detected! Proceeding...");
-            } else {
-                log_info!("navi_main", "No green light yet, retrying...");
-                sleep(Duration::from_millis(500));
-            }
-        }
-        Err(err) => {
-            log_info!("navi_main", "YOLO service call failed, retrying: {:?}", err);
-            sleep(Duration::from_millis(500));
-        }
-    }
+        20,
+        Some("camera1"),
+    );
 
     let waypoints = vec![Pos {
         translation: CoordUnit(2.6, 0.0, 0.0),
@@ -117,23 +104,18 @@ fn main() -> anyhow::Result<()> {
         log_info!("navi_main", "SERVO left command failed: {:?}", err);
     }
 
-    match navi_node.call_yolo_blocking(
+    vision::run_yolo_detection(
+        &navi_node,
         &mut executor,
-        Some("people"),
-        Some("camera1"),
-        Duration::from_secs_f32(2.0),
-    ) {
-        Ok(yolo_response) => {
-            println!("yolo: {:?}", yolo_response.message);
-        }
-        Err(err) => {
-            log_info!(
-                "navi_main",
-                "YOLO service unavailable or timed out, continuing without detection: {:?}",
-                err
-            );
-        }
-    }
+        VisionRequest {
+            label: "camera1 people scan (waypoint 1)",
+            model: Some("people"),
+            camera: Some("camera1"),
+            timeout: Duration::from_secs_f32(2.0),
+            category: Some(VisionCategory::GoodPeople),
+        },
+        &mut vision_result,
+    );
 
     let waypoints = vec![
         Pos {
@@ -155,23 +137,18 @@ fn main() -> anyhow::Result<()> {
         "Second person reached! Stopping navigation..."
     );
 
-    match navi_node.call_yolo_blocking(
+    vision::run_yolo_detection(
+        &navi_node,
         &mut executor,
-        Some("people"),
-        Some("camera2"),
-        Duration::from_secs_f32(2.0),
-    ) {
-        Ok(yolo_response) => {
-            println!("yolo: {:?}", yolo_response.message);
-        }
-        Err(err) => {
-            log_info!(
-                "navi_main",
-                "YOLO service unavailable or timed out, continuing without detection: {:?}",
-                err
-            );
-        }
-    }
+        VisionRequest {
+            label: "camera2 people scan (waypoint 2)",
+            model: Some("people"),
+            camera: Some("camera2"),
+            timeout: Duration::from_secs_f32(2.0),
+            category: Some(VisionCategory::BadPeople),
+        },
+        &mut vision_result,
+    );
 
     let waypoints = vec![
         Pos {
@@ -193,23 +170,18 @@ fn main() -> anyhow::Result<()> {
         "Third person reached! Stopping navigation..."
     );
 
-    match navi_node.call_yolo_blocking(
+    vision::run_yolo_detection(
+        &navi_node,
         &mut executor,
-        Some("people"),
-        Some("camera1"),
-        Duration::from_secs_f32(2.0),
-    ) {
-        Ok(yolo_response) => {
-            println!("yolo: {:?}", yolo_response.message);
-        }
-        Err(err) => {
-            log_info!(
-                "navi_main",
-                "YOLO service unavailable or timed out, continuing without detection: {:?}",
-                err
-            );
-        }
-    }
+        VisionRequest {
+            label: "camera1 people scan (waypoint 3)",
+            model: Some("people"),
+            camera: Some("camera1"),
+            timeout: Duration::from_secs_f32(2.0),
+            category: Some(VisionCategory::GoodPeople),
+        },
+        &mut vision_result,
+    );
 
     if let Err(err) =
         navi_node.call_servo_blocking(&mut executor, ServoState::RIGHT, Duration::from_secs(1))
@@ -217,60 +189,41 @@ fn main() -> anyhow::Result<()> {
         log_info!("navi_main", "SERVO left command failed: {:?}", err);
     }
 
-    match navi_node.call_yolo_blocking(
+    vision::run_yolo_detection(
+        &navi_node,
         &mut executor,
-        Some("people"),
-        Some("camera1"),
-        Duration::from_secs_f32(2.0),
-    ) {
-        Ok(yolo_response) => {
-            println!("yolo: {:?}", yolo_response.message);
-        }
-        Err(err) => {
-            log_info!(
-                "navi_main",
-                "YOLO service unavailable or timed out, continuing without detection: {:?}",
-                err
-            );
-        }
-    }
+        VisionRequest {
+            label: "camera1 people scan (servo right sweep)",
+            model: Some("people"),
+            camera: Some("camera1"),
+            timeout: Duration::from_secs_f32(2.0),
+            category: Some(VisionCategory::GoodPeople),
+        },
+        &mut vision_result,
+    );
 
-    match navi_node.call_ocr_blocking(&mut executor, Duration::from_secs_f32(2.0)) {
-        Ok(ocr_response) => {
-            println!("ocr: {:?}", ocr_response.message);
-        }
-        Err(err) => {
-            log_info!(
-                "navi_main",
-                "OCR service unavailable or timed out, continuing without detection: {:?}",
-                err
-            );
-        }
-    }
-
-    navi_node.publish_tts("ero发现")?;
-    spin_tick!(executor);
-
-    match navi_node.call_yolo_blocking(
+    vision::run_ocr_detection(
+        &navi_node,
         &mut executor,
-        Some("fire"),
-        Some("camera2"),
         Duration::from_secs_f32(2.0),
-    ) {
-        Ok(yolo_response) => {
-            println!("yolo: {:?}", yolo_response.message);
-        }
-        Err(err) => {
-            log_info!(
-                "navi_main",
-                "YOLO service unavailable or timed out, continuing without detection: {:?}",
-                err
-            );
-        }
-    }
+        "OCR checkpoint 1",
+        &mut vision_result,
+    );
 
-    navi_node.publish_tts("晨光大厦")?;
-    spin_tick!(executor);
+    vision::run_yolo_detection(
+        &navi_node,
+        &mut executor,
+        VisionRequest {
+            label: "fire scan (camera2)",
+            model: Some("fire"),
+            camera: Some("camera2"),
+            timeout: Duration::from_secs_f32(2.0),
+            category: Some(VisionCategory::Fire),
+        },
+        &mut vision_result,
+    );
+
+    navi_node.call_tts_blocking(&mut executor, "晨光大厦", Duration::from_secs(10))?;
 
     let waypoints = vec![
         Pos {
@@ -298,23 +251,18 @@ fn main() -> anyhow::Result<()> {
         log_info!("navi_main", "SERVO center command failed: {:?}", err);
     }
 
-    match navi_node.call_yolo_blocking(
+    vision::run_yolo_detection(
+        &navi_node,
         &mut executor,
-        Some("people"),
-        Some("camera1"),
-        Duration::from_secs_f32(2.0),
-    ) {
-        Ok(yolo_response) => {
-            println!("yolo: {:?}", yolo_response.message);
-        }
-        Err(err) => {
-            log_info!(
-                "navi_main",
-                "YOLO service unavailable or timed out, continuing without detection: {:?}",
-                err
-            );
-        }
-    }
+        VisionRequest {
+            label: "camera1 people scan (mid route)",
+            model: Some("people"),
+            camera: Some("camera1"),
+            timeout: Duration::from_secs_f32(2.0),
+            category: Some(VisionCategory::GoodPeople),
+        },
+        &mut vision_result,
+    );
 
     if let Err(err) =
         navi_node.call_servo_blocking(&mut executor, ServoState::LEFT, Duration::from_secs(1))
@@ -322,30 +270,13 @@ fn main() -> anyhow::Result<()> {
         log_info!("navi_main", "SERVO left command failed: {:?}", err);
     }
 
-    log_info!("navi_main", "Waiting for green light...");
-    match navi_node.call_yolo_blocking(
+    vision::wait_for_green_light(
+        &navi_node,
         &mut executor,
-        Some("traffic_light"),
-        Some("camera1"),
         Duration::from_secs_f32(2.0),
-    ) {
-        Ok(yolo_response) => {
-            log_info!(
-                "navi_main",
-                "Traffic light detection: {:?}",
-                yolo_response.message
-            );
-            // 检查响应中是否包含"绿灯"
-            if yolo_response.message.contains("绿灯") {
-                log_info!("navi_main", "Green light detected! Proceeding...");
-            } else {
-                log_info!("navi_main", "No green light yet, retrying...");
-            }
-        }
-        Err(err) => {
-            log_info!("navi_main", "YOLO service call failed, retrying: {:?}", err);
-        }
-    }
+        20,
+        Some("camera1"),
+    );
 
     let waypoints = vec![Pos {
         translation: CoordUnit(1.8, 3.4, 0.0),
@@ -367,18 +298,13 @@ fn main() -> anyhow::Result<()> {
         log_info!("navi_main", "SERVO left command failed: {:?}", err);
     }
 
-    match navi_node.call_ocr_blocking(&mut executor, Duration::from_secs_f32(2.0)) {
-        Ok(ocr_response) => {
-            println!("ocr: {:?}", ocr_response.message);
-        }
-        Err(err) => {
-            log_info!(
-                "navi_main",
-                "OCR service unavailable or timed out, continuing without detection: {:?}",
-                err
-            );
-        }
-    }
+    vision::run_ocr_detection(
+        &navi_node,
+        &mut executor,
+        Duration::from_secs_f32(2.0),
+        "OCR checkpoint 2",
+        &mut vision_result,
+    );
 
     // 任务完成后回正舵机
     if let Err(err) =
@@ -410,23 +336,18 @@ fn main() -> anyhow::Result<()> {
     log_info!("navi_main", "Sleeping for 1 secs.");
     sleep(std::time::Duration::from_secs_f32(1.0));
 
-    match navi_node.call_yolo_blocking(
+    vision::run_yolo_detection(
+        &navi_node,
         &mut executor,
-        Some("rubbish_bin"),
-        Some("camera1"),
-        Duration::from_secs_f32(2.0),
-    ) {
-        Ok(yolo_response) => {
-            println!("yolo: {:?}", yolo_response.message);
-        }
-        Err(err) => {
-            log_info!(
-                "navi_main",
-                "YOLO service unavailable or timed out, continuing without detection: {:?}",
-                err
-            );
-        }
-    }
+        VisionRequest {
+            label: "rubbish bin scan",
+            model: Some("rubbish_bin"),
+            camera: Some("camera1"),
+            timeout: Duration::from_secs_f32(2.0),
+            category: None,
+        },
+        &mut vision_result,
+    );
 
     let waypoints = vec![Pos {
         translation: CoordUnit(0.6, 1.5, 0.0),
@@ -442,23 +363,18 @@ fn main() -> anyhow::Result<()> {
         "Forth building reached! Stopping navigation..."
     );
 
-    match navi_node.call_yolo_blocking(
+    vision::run_yolo_detection(
+        &navi_node,
         &mut executor,
-        Some("e_bike"),
-        Some("camera2"),
-        Duration::from_secs_f32(2.0),
-    ) {
-        Ok(yolo_response) => {
-            println!("yolo: {:?}", yolo_response.message);
-        }
-        Err(err) => {
-            log_info!(
-                "navi_main",
-                "YOLO service unavailable or timed out, continuing without detection: {:?}",
-                err
-            );
-        }
-    }
+        VisionRequest {
+            label: "e-bike scan (segment 1)",
+            model: Some("e_bike"),
+            camera: Some("camera2"),
+            timeout: Duration::from_secs_f32(2.0),
+            category: Some(VisionCategory::Automobile),
+        },
+        &mut vision_result,
+    );
 
     let waypoints = vec![Pos {
         translation: CoordUnit(0.6, 0.7, 0.0),
@@ -474,23 +390,18 @@ fn main() -> anyhow::Result<()> {
         "Fifth automobile reached! Stopping navigation..."
     );
 
-    match navi_node.call_yolo_blocking(
+    vision::run_yolo_detection(
+        &navi_node,
         &mut executor,
-        Some("e_bike"),
-        Some("camera2"),
-        Duration::from_secs_f32(2.0),
-    ) {
-        Ok(yolo_response) => {
-            println!("yolo: {:?}", yolo_response.message);
-        }
-        Err(err) => {
-            log_info!(
-                "navi_main",
-                "YOLO service unavailable or timed out, continuing without detection: {:?}",
-                err
-            );
-        }
-    }
+        VisionRequest {
+            label: "e-bike scan (segment 2)",
+            model: Some("e_bike"),
+            camera: Some("camera2"),
+            timeout: Duration::from_secs_f32(2.0),
+            category: Some(VisionCategory::Automobile),
+        },
+        &mut vision_result,
+    );
 
     let waypoints = vec![
         Pos {
@@ -512,6 +423,7 @@ fn main() -> anyhow::Result<()> {
         "All waypoints reached! Stopping navigation..."
     );
 
+    log_info!("navi_main", "Vision summary => {}", vision_result.summary());
     log_info!("navi_main", "Navigation completed, exiting cleanly");
     Ok(())
 }

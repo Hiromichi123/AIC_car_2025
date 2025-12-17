@@ -20,22 +20,6 @@ def generate_launch_description():
         'tools_real.launch.py'
     )
 
-    # 视觉
-    vision_node = Node(
-        package='vision_node',
-        executable='vision_real',
-        name='vision_real',
-        output='screen'
-    )
-
-    # 导航
-    navi_node = Node(
-        package='navi_rs',
-        executable='navi_rs',
-        name='navi_rs',
-        output='screen'
-    )
-
     slam = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(slam_launch)
     )
@@ -47,6 +31,4 @@ def generate_launch_description():
     return LaunchDescription([
         slam,
         ros2_tools,
-        vision_node,
-        #TimerAction(period=5.0, actions=[navi_node]),
     ])

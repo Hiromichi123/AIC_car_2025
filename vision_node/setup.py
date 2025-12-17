@@ -4,36 +4,17 @@ from glob import glob
 
 package_name = 'vision_node'
 
-ocr_packages = [
-    'ocr',
-    'ocr.ppocr',
-    'ocr.ppocr.data',
-    'ocr.ppocr.losses',
-    'ocr.ppocr.metrics',
-    'ocr.ppocr.optimizer',
-    'ocr.ppocr.postprocess',
-    'ocr.ppocr.utils',
-    'ocr.tools',
-    'ocr.tools.infer',
-    # 'ocr.ppocr.utils.e2e_utils',
-]
-
 setup(
     name=package_name,
     version='1.0.0',
-    packages=find_packages(exclude=['test']) + ocr_packages,
-    package_data={
-        'ocr.ppocr.utils': ['*.txt', 'dict/*.txt'],
-    },
+    packages=find_packages(exclude=['test']),
     include_package_data=True,
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        ('share/' + package_name + '/ocr/ppocr/utils', 
-            glob('ocr/ppocr/utils/*.txt')),
         ('share/' + package_name + '/yolo',
-            (glob(' yolo/*.ttf') + glob('yolo/*.pt')) if os.path.exists('yolo') else []),
+            (glob('yolo/*.ttf') + glob('yolo/*.pt')) if os.path.exists('yolo') else []),
     ],
     install_requires=['setuptools'],
     zip_safe=False,
