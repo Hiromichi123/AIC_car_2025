@@ -1,9 +1,11 @@
 import cv2
+import json
 import os
 import sys
 import numpy as np
 import rclpy
 import time
+from collections import Counter
 from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import ReentrantCallbackGroup
@@ -11,86 +13,14 @@ from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 from importlib import import_module
-from ultralytics import YOLO as YOLOModel  # type: ignore
+from ultralytics import YOLO as YOLOModel
 from PIL import ImageFont, ImageDraw, Image as PILImage
-
-from ros2_tools.srv import YOLO
-from ros2_tools.srv import OCR
-from ros2_tools.srv import GarbageClassify
-
+from ros2_tools.srv import YOLO, OCR, GarbageClassify
 from . import config
-
 
 class VisionNode(Node):
     def __init__(self):
         super().__init__("vision_node")
-
-        # 允许通过 ROS 参数覆盖资源路径
-        self.declare_parameter("vision_node_src_dir", config.VISION_NODE_SRC_DIR)
-        requested_src_dir = (
-            self.get_parameter("vision_node_src_dir").get_parameter_value().string_value
-        )
-        try:
-            resolved_src_dir = config.configure_paths(requested_src_dir)
-            self.get_logger().info(f"使用 vision_node 资源目录: {resolved_src_dir}")
-        except ValueError as exc:
-            self.get_logger().warn(f"指定的 vision_node 目录无效，回退到默认值: {exc}")
-            resolved_src_dir = config.VISION_NODE_SRC_DIR
-
-        # 确保 PaddleOCR 依赖路径在 sys.path 中
-        self._ensure_paddleocr_paths(resolved_src_dir)
-
-        # 动态导入 PaddleOCR，确保在路径更新后加载
-        try:
-            paddleocr_module = import_module("paddleocr")
-            self._paddleocr_ctor = paddleocr_module.PaddleOCR
-        except Exception as exc:
-            raise ImportError(
-                f"无法导入 PaddleOCR，请检查目录 {resolved_src_dir}/ocr: {exc}"
-            ) from exc
-
-        # 初始化CvBridge用于ROS图像消息转换
-        self.bridge = CvBridge()
-
-        # 存储最新的图像数据
-        self.camera1_image = None  # 单目旋转相机
-        self.camera2_image = None  # 双目固定相机
-
-        # 使用 ReentrantCallbackGroup 允许在服务回调中处理图像订阅
-        self.cb_group = ReentrantCallbackGroup()
-
-        # 创建订阅者
-        # 相机话题通常使用 sensor data QoS，避免可靠模式导致丢帧阻塞
-        qos_profile = QoSProfile(
-            reliability=ReliabilityPolicy.BEST_EFFORT,
-            history=HistoryPolicy.KEEP_LAST,
-            depth=1
-        )
-        # 普通相机
-        self.camera1_image_sub = self.create_subscription(
-            Image, "/camera/video", self.camera1_image_callback, qos_profile, callback_group=self.cb_group
-        )
-        # 深度相机
-        self.camera2_image_sub = self.create_subscription(
-            Image, "/camera/d435/color/image_raw", self.camera2_image_callback, qos_profile, callback_group=self.cb_group
-        )
-        self.srv_yolo = self.create_service(YOLO, "yolo_trigger", self.yolo_callback, callback_group=self.cb_group)
-        self.srv_ocr = self.create_service(OCR, "ocr_trigger", self.ocr_callback, callback_group=self.cb_group)
-
-        # 创建垃圾分类客户端
-        self.garbage_classify_client = self.create_client(GarbageClassify, 'garbage_classify')
-
-        # 初始化YOLO模型
-        self.yolo_model_path_default = config.YOLO_MODEL_PATH
-        self.yolo_font_path = config.YOLO_FONT_PATH
-        self.yolo_save_dir = "/home/jetson/ros2/AIC_car_2025/vision_node/yolo/result"
-        os.makedirs(self.yolo_save_dir, exist_ok=True)
-
-        self.yolo_models = {}  # 缓存已加载模型
-        self.yolo_model_paths = config.YOLO_MODELS
-
-        # YOLO模型标签配置 - 按模型名称分类
-        self.yolo_labels_config = config.YOLO_LABELS
 
         # 颜色映射
         self.custom_color_map = {
@@ -107,13 +37,16 @@ class VisionNode(Node):
         # 模型类别到中文标签映射
         self.model_label_maps = {
             "traffic_light": {
-                0: "green", # 绿灯
-                1: "red", # 红灯
+                0: "green",  # 绿灯
+                1: "red",    # 红灯
                 2: "yellow", # 黄灯
             },
             "people": {
-                0: "bad", # 非社区人员
+                0: "bad",  # 非社区人员
                 1: "good", # 社区人员
+            },
+            "fire": {
+                0: "fire", # 火灾
             },
             "rubbish_bin": {
                 0: "harm_close",    # 有害关
@@ -131,13 +64,69 @@ class VisionNode(Node):
                 2: "incorrect", # 违停
             },
             "default": {
-                0: "target_1",
-                1: "target_2",
-                2: "target_3",
-                3: "target_4",
-                4: "target_5",
+                0: "t",
+                1: "ta",
+                2: "tar",
+                3: "targ",
+                4: "targe",
+                5: "target",
             }
         }
+
+        self.bridge = CvBridge()
+
+        resolved_src_dir = config.VISION_NODE_SRC_DIR #路径解析
+
+        # 确保 PaddleOCR 依赖路径在 sys.path 中
+        self._ensure_paddleocr_paths(resolved_src_dir)
+
+        # 动态导入 PaddleOCR，确保在路径更新后加载
+        try:
+            paddleocr_module = import_module("paddleocr")
+            self._paddleocr_ctor = paddleocr_module.PaddleOCR
+        except Exception as exc:
+            raise ImportError(
+                f"无法导入 PaddleOCR，请检查目录 {resolved_src_dir}/ocr: {exc}"
+            ) from exc
+
+        # 存储最新的图像数据
+        self.camera1_image = None  # 单目旋转相机
+        self.camera2_image = None  # 双目固定相机
+
+        # 使用 ReentrantCallbackGroup 允许在服务回调中处理图像订阅
+        self.cb_group = ReentrantCallbackGroup()
+
+        # 创建订阅者
+        qos_profile = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1
+        )
+        # 普通相机
+        self.camera1_image_sub = self.create_subscription(
+            Image, "/camera/video", self.camera1_image_callback, qos_profile, callback_group=self.cb_group
+        )
+        # 深度相机
+        self.camera2_image_sub = self.create_subscription(
+            Image, "/camera/d435/color/image_raw", self.camera2_image_callback, qos_profile, callback_group=self.cb_group
+        )
+        self.srv_yolo = self.create_service(YOLO, "yolo_trigger", self.yolo_callback, callback_group=self.cb_group)
+        self.srv_ocr = self.create_service(OCR, "ocr_trigger", self.ocr_callback, callback_group=self.cb_group)
+
+        # 垃圾分类client
+        self.garbage_classify_client = self.create_client(GarbageClassify, 'garbage_classify')
+
+        # 初始化YOLO模型
+        self.yolo_model_path_default = config.YOLO_MODEL_PATH
+        self.yolo_font_path = config.YOLO_FONT_PATH
+        self.yolo_save_dir = "/home/jetson/ros2/AIC_car_2025/vision_node/yolo/result"
+        os.makedirs(self.yolo_save_dir, exist_ok=True)
+
+        self.yolo_models = {}  # 缓存已加载模型
+        self.yolo_model_paths = config.YOLO_MODELS
+
+        # YOLO模型标签配置 - 按模型名称分类
+        self.yolo_labels_config = config.YOLO_LABELS
 
         # 初始化PaddleOCR
         try:
@@ -197,11 +186,11 @@ class VisionNode(Node):
             return response
 
         try:
-            # 交通灯模型循环检测直到绿灯
+            # 交通灯检测特判
             if model_name == "traffic_light":
                 return self._handle_traffic_light_detection(request, response, model, model_path, model_name, camera_mode)
             
-            # 垃圾桶检测 - 检测到后调用 yolip 服务
+            # 垃圾桶检测特判
             if model_name == "rubbish_bin":
                 return self._handle_rubbish_bin_detection(request, response, model, model_path, model_name, camera_mode)
             
@@ -209,9 +198,14 @@ class VisionNode(Node):
             return self._handle_standard_detection(request, response, model, model_path, model_name, camera_mode)
 
         except Exception as e:
-            self.get_logger().error(f"YOLO检测异常: {e}")
+            self.get_logger().error(f"[vision_node] YOLO检测出错: {e}")
             response.success = False
-            response.message = f"YOLO检测失败: {str(e)}"
+            response.message = json.dumps({
+                "model": model_name,
+                "camera": camera_mode,
+                "error": str(e),
+                "status": "exception"
+            }, ensure_ascii=False)
             return response
 
     def _handle_traffic_light_detection(self, request, response, model, model_path, model_name, camera_mode):
@@ -219,14 +213,14 @@ class VisionNode(Node):
         max_wait = 20.0
         poll_interval = 0.5
         deadline = time.time() + max_wait
+        last_results = []
 
         while time.time() < deadline:
-            ts = time.strftime("%Y%m%d-%H%M%S") + f"_{int(time.time() * 1000) % 1000:03d}"
+            ts = time.strftime("%Y%m%d-%H%M%S")
             
             # 获取当前相机图像
             current_images = self._get_camera_images(camera_mode)
             if not current_images:
-                # 图像未就绪，继续等待
                 time.sleep(poll_interval)
                 continue
 
@@ -245,11 +239,19 @@ class VisionNode(Node):
                 )
                 all_results.extend(det_results)
 
+            if all_results:
+                last_results = all_results
+
             # 检查是否检测到绿灯
             green_hits = [msg for msg in all_results if "绿灯" in msg]
             if green_hits:
                 response.success = True
-                response.message = f"检测到绿灯: {'; '.join(green_hits)}"
+                response.message = self._format_detection_message(
+                    model_name,
+                    camera_mode,
+                    all_results,
+                    extra={"status": "green_detected"}
+                )
                 self.get_logger().info("✅ 绿灯检测成功")
                 return response
 
@@ -257,19 +259,32 @@ class VisionNode(Node):
 
         # 超时未检测到绿灯
         response.success = False
-        response.message = f"等待绿灯超时({max_wait}秒)"
+        response.message = self._format_detection_message(
+            model_name,
+            camera_mode,
+            last_results,
+            extra={"status": "timeout", "timeout_sec": max_wait}
+        )
         self.get_logger().warn("⚠️ 绿灯检测超时")
         return response
 
     def _handle_rubbish_bin_detection(self, request, response, model, model_path, model_name, camera_mode):
-        """垃圾桶检测 - 检测到垃圾桶后调用yolip服务进行垃圾分类"""
+        """检测到垃圾桶后调用yolip服务进行垃圾分类"""
         ts = time.strftime("%Y%m%d-%H%M%S")
         
         # 获取相机图像
         camera_images = self._get_camera_images(camera_mode)
         if not camera_images:
             response.success = False
-            response.message = self._get_missing_camera_message(camera_mode)
+            response.message = self._format_detection_message(
+                model_name,
+                camera_mode,
+                [],
+                extra={
+                    "status": "no_camera",
+                    "error": self._get_missing_camera_message(camera_mode)
+                }
+            )
             return response
 
         # 使用垃圾桶检测模型检测垃圾桶
@@ -290,7 +305,12 @@ class VisionNode(Node):
 
         if not all_results:
             response.success = False
-            response.message = "未检测到垃圾桶"
+            response.message = self._format_detection_message(
+                model_name,
+                camera_mode,
+                all_results,
+                extra={"status": "no_detection"}
+            )
             return response
 
         # 检测到垃圾桶后，调用yolip服务进行垃圾分类
@@ -299,7 +319,15 @@ class VisionNode(Node):
         # 等待服务可用
         if not self.garbage_classify_client.wait_for_service(timeout_sec=5.0):
             response.success = False
-            response.message = f"yolip垃圾分类服务不可用。垃圾桶检测结果: {'; '.join(all_results)}"
+            response.message = self._format_detection_message(
+                model_name,
+                camera_mode,
+                all_results,
+                extra={
+                    "status": "service_unavailable",
+                    "error": "yolip垃圾分类服务不可用"
+                }
+            )
             self.get_logger().error("yolip服务未启动")
             return response
 
@@ -314,20 +342,46 @@ class VisionNode(Node):
             classify_response = future.result()
             if classify_response.success:
                 response.success = True
-                response.message = (
-                    f"垃圾分类完成: [{classify_response.category}] "
-                    f"{classify_response.item_name} "
-                    f"(置信度: {classify_response.confidence:.2f}). "
-                    f"垃圾桶位置: {'; '.join(all_results)}"
+                response.message = self._format_detection_message(
+                    model_name,
+                    camera_mode,
+                    all_results,
+                    extra={
+                        "status": "garbage_classified",
+                        "garbage_classification": {
+                            "category": classify_response.category,
+                            "item_name": classify_response.item_name,
+                            "confidence": round(classify_response.confidence, 4),
+                            "message": classify_response.message,
+                        }
+                    }
                 )
                 self.get_logger().info(f"✅ {response.message}")
             else:
                 response.success = False
-                response.message = f"垃圾分类失败: {classify_response.message}. 垃圾桶检测: {'; '.join(all_results)}"
+                response.message = self._format_detection_message(
+                    model_name,
+                    camera_mode,
+                    all_results,
+                    extra={
+                        "status": "garbage_classify_failed",
+                        "garbage_classification": {
+                            "category": classify_response.category,
+                            "item_name": classify_response.item_name,
+                            "confidence": round(classify_response.confidence, 4),
+                            "message": classify_response.message,
+                        }
+                    }
+                )
                 self.get_logger().warn(f"⚠️ {response.message}")
         else:
             response.success = False
-            response.message = f"垃圾分类服务调用超时。垃圾桶检测: {'; '.join(all_results)}"
+            response.message = self._format_detection_message(
+                model_name,
+                camera_mode,
+                all_results,
+                extra={"status": "garbage_classify_timeout"}
+            )
             self.get_logger().error("yolip服务调用超时")
         
         return response
@@ -349,7 +403,7 @@ class VisionNode(Node):
             self.get_logger().info(f"处理{cam_name}图像... 使用模型: {model_name}")
             det_results = self._process_yolo_image(
                 frame.copy(),
-                f"{cam_name}_{ts}_{model_name}",  # Add model name to filename
+                f"{cam_name}_{ts}_{model_name}",
                 cam_name,
                 model,
                 model_name,
@@ -361,10 +415,13 @@ class VisionNode(Node):
 
         # 返回结果
         response.success = True
-        if all_results:
-            response.message = f"YOLO检测到{len(all_results)}个目标。结果: {'; '.join(all_results)}"
-        else:
-            response.message = "YOLO未检测到目标"
+        status = "ok" if all_results else "no_detection"
+        response.message = self._format_detection_message(
+            model_name,
+            camera_mode,
+            all_results,
+            extra={"status": status}
+        )
         
         return response
 
@@ -394,29 +451,45 @@ class VisionNode(Node):
             return f"{'、'.join(missing)}图像未接收"
         return "未接收到可用图像"
 
-    def _process_yolo_image(
-        self,
-        frame,
-        filename_prefix,
-        camera_name,
-        model,
-        model_name,
-        suppress_empty_warn: bool = False,
-        save_result: bool = True,
-        return_frame: bool = False,
-    ):
-        """处理单张图像的YOLO检测
+    def _extract_label_from_result(self, result_text: str) -> str:
+        """从检测结果字符串中解析类别标签"""
+        try:
+            start = result_text.index("] ") + 2
+            end = result_text.index(" (")
+            return result_text[start:end].strip()
+        except ValueError:
+            return ""
 
-        Args:
-            frame: 输入图像
-            filename_prefix: 保存文件名前缀
-            camera_name: 相机名称
-            model: YOLO模型实例
-            model_name: 模型名称,用于查找对应的标签配置
-            suppress_empty_warn: 是否抑制空结果警告
-            save_result: 是否保存结果图像
-            return_frame: 是否返回处理后的图像帧
-        """
+    def _format_detection_message(self, model_name: str, camera_mode: str, detections, extra: dict | None = None) -> str:
+        """将检测结果整理成JSON字符串，附带类别计数"""
+        if detections is None:
+            detections = []
+
+        labels = [label for label in (self._extract_label_from_result(item) for item in detections) if label]
+        label_counts = Counter(labels)
+
+        payload = {
+            "model": model_name,
+            "camera": camera_mode,
+            "total": sum(label_counts.values()),
+            "detections": [
+                {"label": label, "count": count} for label, count in label_counts.items()
+            ],
+            "details": detections,
+        }
+
+        if extra:
+            payload.update(extra)
+
+        return json.dumps(payload, ensure_ascii=False)
+
+    def _process_yolo_image(self,frame,
+        filename_prefix, # 保存文件名前缀
+        camera_name,model,model_name,
+        suppress_empty_warn: bool = False, # 抑制空结果警告
+        save_result: bool = True, # 保存检测结果图像
+    ):
+        """处理单张图像的YOLO检测"""
         detection_results = []
 
         # YOLO检测，输入尺寸960
@@ -475,7 +548,7 @@ class VisionNode(Node):
                 result_str = f"[{camera_name}] {label} (置信度: {conf:.2f})"
                 detection_results.append(result_str)
         
-        # 2. 处理图像分类结果 (Probs) - 针对交通灯分类模型
+        # 处理图像分类结果 (Probs) - 针对交通灯分类模型
         elif results and hasattr(results[0], 'probs') and results[0].probs is not None:
             has_detections = True
             probs = results[0].probs
@@ -500,22 +573,17 @@ class VisionNode(Node):
 
         # 保存检测结果图像
         if save_result:
-            result_path = os.path.join(
-                self.yolo_save_dir, f"{filename_prefix}_result.jpg"
-            )
+            result_path = os.path.join(self.yolo_save_dir, f"{filename_prefix}.jpg")
             cv2.imwrite(result_path, frame)
-            self.get_logger().info(f"✅ {camera_name}检测结果已保存到: {result_path}")
             
         if not has_detections:
              if not suppress_empty_warn:
                 self.get_logger().info(f"{camera_name} 未检测到目标")
 
-        if return_frame:
-            return detection_results, frame
         return detection_results
 
     def _get_yolo_model(self, model_name: str):
-        """按需加载或复用 YOLO 模型，返回 (model, path)"""
+        """加载或复用模型，返回 (model, path)"""
         chosen_path = None
 
         if model_name:
@@ -555,12 +623,10 @@ class VisionNode(Node):
         # 检查两个相机的图像
         if self.camera1_image is None and self.camera2_image is None:
             response.success = False
-            response.message = "Camera1和Camera2图像均未接收"
+            response.message = "Camera1/2图像均未接收"
             return response
 
         try:
-            import time
-
             timestamp = time.strftime("%Y%m%d-%H%M%S")
             all_ocr_results = []
 
@@ -593,9 +659,7 @@ class VisionNode(Node):
     def _process_ocr_image(self, frame, filename_prefix, camera_name):
         """处理单张图像的OCR识别"""
         ocr_results = []
-
-        # OCR识别
-        result = self.ocr_engine.ocr(frame, cls=True)
+        result = self.ocr_engine.ocr(frame, cls=True) # OCR识别
 
         if result and result[0]:
             for line in result[0]:
@@ -606,7 +670,7 @@ class VisionNode(Node):
                 self.get_logger().info(f"识别到文本:{result_str}")
 
         # 保存结果图像
-        result_path = os.path.join(self.ocr_save_dir, f"{filename_prefix}_result.jpg")
+        result_path = os.path.join(self.ocr_save_dir, f"{filename_prefix}.jpg")
         cv2.imwrite(result_path, frame)
         self.get_logger().info(f"✅{camera_name}OCR结果已保存到:{result_path}")
 
