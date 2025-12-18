@@ -59,7 +59,7 @@ private:
       return;
     }
 
-    cv::flip(this->frame, this->flipped_frame, 0);  // 0 表示上下翻转
+    cv::rotate(this->frame, this->flipped_frame, cv::ROTATE_180);  // 旋转 180 度
 
     this->cv_image.encoding = "bgr8";
     this->cv_image.image = this->flipped_frame;

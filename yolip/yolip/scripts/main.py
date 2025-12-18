@@ -74,13 +74,41 @@ class yolip_node(Node):
         
         try:
             result = self._perform_classification(rgb_img)
-            
-            if result:
+
+            best = None
+            all_candidates = []
+            if isinstance(result, dict):
+                best = result.get('best')
+                all_candidates = result.get('all', []) or []
+            else:
+                best = result
+
+            # 填充多目标数组字段：每个 YOLO 小框对应一个 best CLIP 结果
+            response.categories = [c['category'] for c in all_candidates]
+            response.item_names = [c['item_name'] for c in all_candidates]
+            response.confidences = [float(c['confidence']) for c in all_candidates]
+
+            if best:
                 response.success = True
-                response.category = result['category']
-                response.item_name = result['item_name']
-                response.confidence = float(result['confidence'])
-                response.message = f"识别成功: [{result['category']}] {result['item_name']} (置信度: {result['confidence']:.2f})"
+                response.category = best['category']
+                response.item_name = best['item_name']
+                response.confidence = float(best['confidence'])
+
+                # 将所有候选结果附带到 message（便于调试/上层查看），不影响字段语义
+                if all_candidates:
+                    candidates_str = "; ".join(
+                        f"[{c['category']}] {c['item_name']}({float(c['confidence']):.2f})"
+                        for c in all_candidates
+                    )
+                    response.message = (
+                        f"识别成功: [{best['category']}] {best['item_name']} (置信度: {float(best['confidence']):.2f}). "
+                        f"候选: {candidates_str}"
+                    )
+                else:
+                    response.message = (
+                        f"识别成功: [{best['category']}] {best['item_name']} (置信度: {float(best['confidence']):.2f})"
+                    )
+
                 self.get_logger().info(response.message)
             else:
                 response.success = False
@@ -88,6 +116,11 @@ class yolip_node(Node):
                 response.category = ""
                 response.item_name = ""
                 response.confidence = 0.0
+
+                # 数组字段保持为空
+                response.categories = []
+                response.item_names = []
+                response.confidences = []
                 
         except Exception as e:
             self.get_logger().error(f"分类处理异常: {e}")
@@ -96,12 +129,15 @@ class yolip_node(Node):
             response.category = ""
             response.item_name = ""
             response.confidence = 0.0
+            response.categories = []
+            response.item_names = []
+            response.confidences = []
         
         return response
 
     # 执行分类识别
     def _perform_classification(self, img):
-        """进行 YOLO+CLIP 双重识别，返回最佳结果"""
+        """进行 YOLO+CLIP 双重识别，返回最佳结果 + 全部候选列表"""
         yolo_results = yolo.infer_cut(img) # YOLO检测
         
         if not yolo_results:
@@ -111,6 +147,7 @@ class yolip_node(Node):
         # 对检测到的每个物体进行CLIP分类
         best_result = None
         best_confidence = 0.0
+        all_results = []
         
         for cut_result in yolo_results:
             if not cut_result:
@@ -122,18 +159,23 @@ class yolip_node(Node):
             clip_best = clip.get_best_result(clip_results, min_confidence=0.3)
             if not clip_best:
                 continue
+
+            candidate = {
+                'category': clip_best.category, # 类别
+                'item_name': clip_best.item_name, # 物品名称
+                'confidence': float(clip_best.confidence) # 置信度
+            }
+            all_results.append(candidate)
             
             # 保存置信度最高的结果
             if clip_best.confidence > best_confidence:
                 best_confidence = clip_best.confidence
-                best_result = {
-                    'category': clip_best.category,
-                    'item_name': clip_best.item_name,
-                    'confidence': clip_best.confidence,
-                    'cut_result': cut_result
-                }
-        
-        return best_result
+                best_result = candidate
+
+        return {
+            'best': best_result,
+            'all': all_results,
+        }
 
 def main(args=None):
     rclpy.init(args=args)

@@ -15,14 +15,14 @@ public:
     PositionController()
     : Node("bsp_node"),
       Kp_linear_(declare_parameter("kp_linear", 2.0)),
-      Ki_linear_(declare_parameter("ki_linear", 0.03)),
-      Kd_linear_(declare_parameter("kd_linear", 0.03)),
-      Kp_angular_(declare_parameter("kp_angular", 3.0)),
-      Ki_angular_(declare_parameter("ki_angular", 0.03)),
-      Kd_angular_(declare_parameter("kd_angular", 0.03)),
+      Ki_linear_(declare_parameter("ki_linear", 0.02)),
+      Kd_linear_(declare_parameter("kd_linear", 0.02)),
+      Kp_angular_(declare_parameter("kp_angular", 2.0)),
+      Ki_angular_(declare_parameter("ki_angular", 0.02)),
+      Kd_angular_(declare_parameter("kd_angular", 0.02)),
       position_threshold_(declare_parameter("position_threshold", 0.00)),
-      angle_threshold_(declare_parameter("angle_threshold", 0.03)),
-      rotation_first_threshold_(declare_parameter("rotation_first_threshold", 0.2))
+      angle_threshold_(declare_parameter("angle_threshold", 0.02)),
+      rotation_first_threshold_(declare_parameter("rotation_first_threshold", 0.1))
   {
     // 目标点订阅
     goal_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
