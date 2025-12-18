@@ -293,19 +293,50 @@ class VisionNode(Node):
         if future.done():
             try:
                 classify_response = future.result()
+                if classify_response is None:
+                    response.success = False
+                    response.message = f"yolip返回空. 垃圾桶检测: {'; '.join(all_results)}"
+                    self.get_logger().error("yolip服务返回None")
+                    return response
+
                 if classify_response.success:
                     response.success = True
-                    response.message = (
-                        f"垃圾分类完成: [{classify_response.category}] "
-                        f"{classify_response.item_name} "
-                        f"(置信度: {classify_response.confidence:.2f}). "
-                        f"垃圾桶位置: {'; '.join(all_results)}"
-                    )
-                    self.get_logger().info(f"✅ {response.message}")
+
+                    # 获取多目标结果（yolip返回数组字段）
+                    categories = list(getattr(classify_response, "categories", []) or [])
+                    item_names = list(getattr(classify_response, "item_names", []) or [])
+                    confidences = list(getattr(classify_response, "confidences", []) or [])
+                    n = min(len(categories), len(item_names), len(confidences))
+                    
+                    if n > 0:
+                        # 构建多个垃圾的描述
+                        items_parts = []
+                        for i in range(n):
+                            items_parts.append(
+                                f"[{categories[i]}] {item_names[i]}({float(confidences[i]):.2f})"
+                            )
+                        
+                        # 拼接所有检测到的垃圾（不是候选，是多个独立结果）
+                        items_str = ", ".join(items_parts)
+                        
+                        response.message = (
+                            f"垃圾分类:  {items_str}. "
+                            f"垃圾桶检测:  {'; '.join(all_results)}"
+                        )
+                    else:
+                        # 降级使用单一结果
+                        response.message = (
+                            f"垃圾分类: [{classify_response.category}] "
+                            f"{classify_response. item_name} "
+                            f"(置信度: {classify_response.confidence:.2f}). "
+                            f"垃圾桶检测: {'; '.join(all_results)}"
+                        )
+                    
+                    self.get_logger().info(response.message)
                 else:
                     response.success = False
-                    response.message = f"垃圾分类失败: {classify_response.message}. 垃圾桶检测: {'; '.join(all_results)}"
-                    self.get_logger().warn(f"⚠️ {response.message}")
+                    response.message = f"垃圾分类失败:  {classify_response.message}.  垃圾桶检测:  {'; '.join(all_results)}"
+                    self.get_logger().warn(f"yolip分类失败: {response.message}")
             except Exception as e:
                 response.success = False
                 response.message = f"垃圾分类服务调用异常: {str(e)}. 垃圾桶检测: {'; '.join(all_results)}"
@@ -554,8 +585,9 @@ class VisionNode(Node):
             return False
 
     def ocr_callback(self, request, response):
-        """OCR识别服务回调函数 - 同时处理camera1和camera2"""
-        self.get_logger().info("开始OCR识别...")
+        """OCR识别服务回调函数 - 支持指定相机"""
+        camera_mode = (request.camera or "").strip().lower() or "both"
+        self.get_logger().info(f"开始OCR识别 (camera={camera_mode})...")
 
         # 延迟初始化OCR引擎
         if not self._ensure_ocr_engine():
@@ -563,10 +595,11 @@ class VisionNode(Node):
             response.message = "OCR引擎初始化失败，请检查PaddleOCR和PaddlePaddle版本兼容性"
             return response
 
-        # 检查两个相机的图像
-        if self.camera1_image is None and self.camera2_image is None:
+        # 获取相机图像
+        camera_images = self._get_camera_images(camera_mode)
+        if not camera_images:
             response.success = False
-            response.message = "Camera1和Camera2图像均未接收"
+            response.message = self._get_missing_camera_message(camera_mode)
             return response
 
         try:
@@ -575,19 +608,11 @@ class VisionNode(Node):
             timestamp = time.strftime("%Y%m%d-%H%M%S")
             all_ocr_results = []
 
-            # 处理Camera1
-            if self.camera1_image is not None:
-                camera1_results = self._process_ocr_image(
-                    self.camera1_image.copy(), f"camera1_{timestamp}", "Camera1"
+            for cam_name, frame in camera_images:
+                results = self._process_ocr_image(
+                    frame.copy(), f"{cam_name}_{timestamp}", cam_name
                 )
-                all_ocr_results.extend(camera1_results)
-
-            # 处理Camera2
-            if self.camera2_image is not None:
-                camera2_results = self._process_ocr_image(
-                    self.camera2_image.copy(), f"camera2_{timestamp}", "Camera2"
-                )
-                all_ocr_results.extend(camera2_results)
+                all_ocr_results.extend(results)
 
             response.success = True
             if all_ocr_results:

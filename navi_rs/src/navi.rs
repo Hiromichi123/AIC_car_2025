@@ -302,11 +302,13 @@ impl NaviSubNode {
     pub fn call_ocr_blocking(
         &self,
         executor: &mut rclrs::Executor,
+        camera: Option<&str>,
         timeout: Duration,
     ) -> anyhow::Result<OCR_Response> {
         log_info!("navi", "Calling OCR service (blocking)...");
 
-        let request = OCR_Request::default();
+        let mut request = OCR_Request::default();
+        request.camera = camera.unwrap_or("both").to_string();
         sleep(std::time::Duration::from_secs_f32(0.5));
 
         // 使用阻塞调用：等待 Promise 完成并获取响应

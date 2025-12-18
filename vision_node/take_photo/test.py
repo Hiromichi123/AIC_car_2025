@@ -1,6 +1,8 @@
 import cv2
 import os
 import subprocess
+import time
+
 
 def list_video_devices():
     devices = []
@@ -23,10 +25,12 @@ def get_v4l2_info(device):
         return f"读取失败: {e}"
 
 
-def test_capture(device):
+def test_capture(device, save_dir="capture_test"):
     print(f"\n============================")
     print(f"测试摄像头: {device}")
     print("============================")
+
+    os.makedirs(save_dir, exist_ok=True)
 
     cap = cv2.VideoCapture(device, cv2.CAP_V4L2)
 
@@ -34,43 +38,36 @@ def test_capture(device):
         print(f"⚠ 无法打开 {device}")
         return
 
-    ret, frame = cap.read()
-    if not ret:
+    # 多读几帧，防止第一帧是空的
+    frame = None
+    for _ in range(10):
+        ret, frame = cap.read()
+        if ret:
+            break
+
+    if frame is None:
         print(f"⚠ 无法从 {device} 读取画面")
         cap.release()
         return
 
     print(f"原始 frame shape：{frame.shape}")
 
-    # 判断是否是 UYVY（单通道）
+    # 单通道 → 转彩色（兼容部分设备）
     if len(frame.shape) == 2:
         print("检测到单通道灰度图 → 尝试 UYVY 转 BGR")
         try:
             frame = cv2.cvtColor(frame, cv2.COLOR_YUV2BGR_UYVY)
             print("转换后 frame shape：", frame.shape)
-        except:
-            print("❌ UYVY 转换失败")
+        except Exception as e:
+            print("❌ UYVY 转换失败:", e)
 
-    print("按 q 退出显示画面...")
-
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-
-        # 自动处理灰度转彩色
-        if len(frame.shape) == 2:
-            try:
-                frame = cv2.cvtColor(frame, cv2.COLOR_YUV2BGR_UYVY)
-            except:
-                pass
-
-        cv2.imshow(device, frame)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+    # 保存图片
+    filename = device.replace("/", "_") + ".jpg"
+    save_path = os.path.join(save_dir, filename)
+    cv2.imwrite(save_path, frame)
+    print(f"✅ 已保存测试帧：{save_path}")
 
     cap.release()
-    cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":

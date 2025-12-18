@@ -352,6 +352,7 @@ fn main() -> anyhow::Result<()> {
     vision::run_ocr_detection(
         &navi_node,
         &mut executor,
+        Some("camera2"),
         Duration::from_secs_f32(8.0),
         "OCR checkpoint 1",
         &mut vision_result_blockb,
@@ -428,6 +429,7 @@ fn main() -> anyhow::Result<()> {
     vision::run_ocr_detection(
         &navi_node,
         &mut executor,
+        Some("camera1"),
         Duration::from_secs_f32(8.0),
         "OCR checkpoint 1",
         &mut vision_result_blockb,
@@ -539,6 +541,7 @@ fn main() -> anyhow::Result<()> {
     vision::run_ocr_detection(
         &navi_node,
         &mut executor,
+        Some("camera2"),
         Duration::from_secs_f32(8.0),
         "OCR checkpoint 3 car1",
         &mut vision_result_block_parking,
@@ -570,6 +573,7 @@ fn main() -> anyhow::Result<()> {
     vision::run_ocr_detection(
         &navi_node,
         &mut executor,
+        Some("camera2"),
         Duration::from_secs_f32(8.0),
         "OCR checkpoint 4 car2",
         &mut vision_result_block_parking,
@@ -615,7 +619,7 @@ fn main() -> anyhow::Result<()> {
         navi_node,
         waypoints,
         0.10,
-        0.30,
+        0.20,
         executor,
         "Third car reached! Stopping navigation..."
     );
@@ -623,6 +627,7 @@ fn main() -> anyhow::Result<()> {
     vision::run_ocr_detection(
         &navi_node,
         &mut executor,
+        Some("camera2"),
         Duration::from_secs_f32(8.0),
         "OCR checkpoint 4 car3",
         &mut vision_result_block_parking,
@@ -646,7 +651,7 @@ fn main() -> anyhow::Result<()> {
         navi_node,
         waypoints,
         0.10,
-        0.30,
+        0.20,
         executor,
         "Forth building reached! Stopping navigation..."
     );
@@ -654,6 +659,7 @@ fn main() -> anyhow::Result<()> {
     vision::run_ocr_detection(
         &navi_node,
         &mut executor,
+        Some("camera1"),
         Duration::from_secs_f32(8.0),
         "OCR checkpoint 4",
         &mut vision_result_block_parking,

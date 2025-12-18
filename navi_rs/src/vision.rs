@@ -302,13 +302,14 @@ pub fn run_yolo_detection(
 pub fn run_ocr_detection(
     node: &NaviSubNode,
     executor: &mut rclrs::Executor,
+    camera: Option<&str>,
     timeout: Duration,
     description: &str,
     result: &mut VisionResult,
 ) {
     log_info!("vision", "{}", description);
 
-    match node.call_ocr_blocking(executor, timeout) {
+    match node.call_ocr_blocking(executor, camera, timeout) {
         Ok(response) => {
             log_info!("vision", "{} -> {}", description, response.message);
             let tokens = parse_ocr_tokens(&response.message);

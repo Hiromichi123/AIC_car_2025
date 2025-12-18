@@ -62,9 +62,9 @@ class yolip_node(Node):
         self.get_logger().info("收到垃圾分类请求...")
         
         # 检查缓存中是否有图像
-        if not self.image_cache:
+        if not self.image_cache: 
             response.success = False
-            response.message = "false"
+            response. message = "图像缓存为空"
             self.get_logger().error("图像缓存为空，无法进行分类")
             return response
         
@@ -78,8 +78,8 @@ class yolip_node(Node):
             best = None
             all_candidates = []
             if isinstance(result, dict):
-                best = result.get('best')
-                all_candidates = result.get('all', []) or []
+                best = result. get('best')
+                all_candidates = result. get('all', []) or []
             else:
                 best = result
 
@@ -88,25 +88,25 @@ class yolip_node(Node):
             response.item_names = [c['item_name'] for c in all_candidates]
             response.confidences = [float(c['confidence']) for c in all_candidates]
 
-            if best:
+            if best and all_candidates:
                 response.success = True
                 response.category = best['category']
                 response.item_name = best['item_name']
                 response.confidence = float(best['confidence'])
 
-                # 将所有候选结果附带到 message（便于调试/上层查看），不影响字段语义
-                if all_candidates:
-                    candidates_str = "; ".join(
+                # 构建多个检测结果的消息
+                if len(all_candidates) > 1:
+                    # 多个目标：列出所有检测到的垃圾
+                    items_str = ", ".join(
                         f"[{c['category']}] {c['item_name']}({float(c['confidence']):.2f})"
                         for c in all_candidates
                     )
-                    response.message = (
-                        f"识别成功: [{best['category']}] {best['item_name']} (置信度: {float(best['confidence']):.2f}). "
-                        f"候选: {candidates_str}"
-                    )
+                    response.message = f"检测到 {len(all_candidates)} 个物品:  {items_str}"
                 else:
+                    # 单个目标
                     response.message = (
-                        f"识别成功: [{best['category']}] {best['item_name']} (置信度: {float(best['confidence']):.2f})"
+                        f"检测到 [{best['category']}] {best['item_name']} "
+                        f"(置信度: {float(best['confidence']):.2f})"
                     )
 
                 self.get_logger().info(response.message)
@@ -116,13 +116,11 @@ class yolip_node(Node):
                 response.category = ""
                 response.item_name = ""
                 response.confidence = 0.0
-
-                # 数组字段保持为空
                 response.categories = []
                 response.item_names = []
                 response.confidences = []
                 
-        except Exception as e:
+        except Exception as e: 
             self.get_logger().error(f"分类处理异常: {e}")
             response.success = False
             response.message = f"分类失败: {str(e)}"
