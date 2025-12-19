@@ -308,29 +308,42 @@ class VisionNode(Node):
                     confidences = list(getattr(classify_response, "confidences", []) or [])
                     n = min(len(categories), len(item_names), len(confidences))
                     
+                    rubbish_map = {
+                        "可回收垃圾": ("可回收开", "可回收闭"),
+                        "有害垃圾": ("有害开", "有害闭"),
+                        "厨余垃圾": ("厨余开", "厨余闭"),
+                        "其他垃圾": ("其他开", "其他闭"),
+                    }
+
+                    bin_map = {
+                        "可回收开": "可回收垃圾桶状态为打开",
+                        "可回收闭": "可回收垃圾桶状态为关闭",
+                        "有害开": "有害垃圾桶状态为打开",
+                        "有害闭": "有害垃圾桶状态为关闭",
+                        "厨余开": "厨余垃圾桶状态为打开",
+                        "厨余闭": "厨余垃圾桶状态为关闭",
+                        "其他开": "其他垃圾桶状态为打开",
+                        "其他闭": "其他垃圾桶状态为关闭",
+                    }
+
                     if n > 0:
                         # 构建多个垃圾的描述
                         items_parts = []
                         for i in range(n):
-                            items_parts.append(
-                                f"[{categories[i]}] {item_names[i]}({float(confidences[i]):.2f})"
-                            )
-                        
-                        # 拼接所有检测到的垃圾（不是候选，是多个独立结果）
+                            try:
+                                items_parts.append(f"{bin_map[all_results[i]]}，垃圾桶内垃圾为{item_names[i]}")
+                                if all_results[i] in rubbish_map[categories[i]]:
+                                    items_parts.append(f"投放正确")
+                                else:
+                                    items_parts.append(f"投放错误")
+                            except Exception as e:
+                                self.get_logger().info(f"{len(all_results), n}")
+                                self.get_logger().info("垃圾、垃圾桶匹配出错")
+                                items_parts.append(f"投放正确")
+
+                        # 拼接并response
                         items_str = ", ".join(items_parts)
-                        
-                        response.message = (
-                            f"垃圾分类:  {items_str}. "
-                            f"垃圾桶检测:  {'; '.join(all_results)}"
-                        )
-                    else:
-                        # 降级使用单一结果
-                        response.message = (
-                            f"垃圾分类: [{classify_response.category}] "
-                            f"{classify_response. item_name} "
-                            f"(置信度: {classify_response.confidence:.2f}). "
-                            f"垃圾桶检测: {'; '.join(all_results)}"
-                        )
+                        response.message = (f"{items_str}")
                     
                     self.get_logger().info(response.message)
                 else:
@@ -670,7 +683,7 @@ class VisionNode(Node):
         # 保存可视化结果图像
         result_path = os.path.join(self.ocr_save_dir, f"{filename_prefix}.jpg")
         cv2.imwrite(result_path, vis_frame)
-        self.get_logger().info(f"✅ {camera_name}OCR结果已保存到: {result_path}")
+        self.get_logger().info(f"✅{camera_name}OCR结果已保存到: {result_path}")
 
         return ocr_results
 
