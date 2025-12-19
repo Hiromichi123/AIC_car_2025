@@ -173,7 +173,7 @@ fn main() -> anyhow::Result<()> {
     );
 
     let waypoints = vec![Pos {
-        translation: CoordUnit(2.6, 0.0, 0.0),
+        translation: CoordUnit(2.55, 0.0, 0.0),
         rotation: CoordUnit(0.0, 0.0, 0.0),
     }];
 
@@ -202,6 +202,19 @@ fn main() -> anyhow::Result<()> {
             camera: Some("camera1"),
             timeout: Duration::from_secs_f32(2.0),
             category: Some(VisionCategory::GoodPeople),
+        },
+        &mut vision_result_blocka,
+    );
+
+    vision::run_yolo_detection(
+        &navi_node,
+        &mut executor,
+        VisionRequest {
+            label: "camera1 ebike scan (waypoint 1)",
+            model: Some("e_bike"),
+            camera: Some("camera1"),
+            timeout: Duration::from_secs_f32(2.0),
+            category: Some(VisionCategory::Automobile),
         },
         &mut vision_result_blocka,
     );
@@ -288,7 +301,7 @@ fn main() -> anyhow::Result<()> {
         &navi_node,
         &mut executor,
         VisionRequest {
-            label: "e-bike scan (block a)",
+            label: "e-bike scan (block a 2)",
             model: Some("e_bike"),
             camera: Some("camera1"),
             timeout: Duration::from_secs_f32(2.0),
@@ -331,6 +344,19 @@ fn main() -> anyhow::Result<()> {
             camera: Some("camera1"),
             timeout: Duration::from_secs_f32(2.0),
             category: Some(VisionCategory::GoodPeople),
+        },
+        &mut vision_result_blockb,
+    );
+
+        vision::run_yolo_detection(
+        &navi_node,
+        &mut executor,
+        VisionRequest {
+            label: "e-bike scan (block b 1)",
+            model: Some("e_bike_block"),
+            camera: Some("camera1"),
+            timeout: Duration::from_secs_f32(2.0),
+            category: Some(VisionCategory::Automobile),
         },
         &mut vision_result_blockb,
     );
@@ -422,6 +448,19 @@ fn main() -> anyhow::Result<()> {
             camera: Some("camera1"),
             timeout: Duration::from_secs_f32(2.0),
             category: Some(VisionCategory::GoodPeople),
+        },
+        &mut vision_result_blockb,
+    );
+
+        vision::run_yolo_detection(
+        &navi_node,
+        &mut executor,
+        VisionRequest {
+            label: "e-bike scan (block b 2)",
+            model: Some("e_bike_block"),
+            camera: Some("camera1"),
+            timeout: Duration::from_secs_f32(2.0),
+            category: Some(VisionCategory::Automobile),
         },
         &mut vision_result_blockb,
     );

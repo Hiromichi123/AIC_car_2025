@@ -32,6 +32,8 @@ public:
     lidar_sub_ = this->create_subscription<ros2_tools::msg::LidarPose>(
         "/lidar_data", 10, std::bind(&PositionController::lidarCallback, this, std::placeholders::_1));
 
+    lidar_pub = this->create_publisher<ros2_tools::msg::LidarPose>("lidar_data", 10);
+    
     // 底层速度命令发布
     cmd_pub_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
 
@@ -39,35 +41,47 @@ public:
   }
 
 private:
+  // void goalCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
+  //   latest_goal_ = *msg;
+  //   has_goal_ = true;
+  //   integral_dx_ = integral_dy_ = integral_yaw_ = 0.0;
+  //   prev_dx_ = prev_dy_ = prev_yaw_ = 0.0;
+  //   first_update_ = true;
+
+  //   // 检查是否有目标朝向
+  //   auto &q = msg->pose.orientation;
+  //   if (fabs(q.x) > 0.001 || fabs(q.y) > 0.001 || fabs(q.z) > 0.001 ||
+  //       fabs(q.w - 1.0) > 0.001) {
+  //     // 有目标朝向
+  //     target_yaw_ = extractYawFromQuaternion(q);
+  //     has_target_yaw_ = true;
+  //     rotating_first_ = true;
+  //     // RCLCPP_INFO(this->get_logger(),
+  //     //             "Goal with orientation: pos(%.2f, %.2f), yaw=%.1f°",
+  //     //             msg->pose.position.x, msg->pose.position.y,
+  //     //             target_yaw_ * 180.0 / M_PI);
+  //   } else {
+  //     // 无目标朝向
+  //     has_target_yaw_ = false;
+  //     rotating_first_ = false;
+  //     // RCLCPP_INFO(this->get_logger(),
+  //     //             "Goal without orientation: pos(%.2f, %.2f)",
+  //     //             msg->pose.position.x, msg->pose.position.y);
+  //   }
+
+  //   computeAndPublish();
+  // }
+  rclcpp::Publisher<ros2_tools::msg::LidarPose>::SharedPtr lidar_pub;
   void goalCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
-    latest_goal_ = *msg;
-    has_goal_ = true;
-    integral_dx_ = integral_dy_ = integral_yaw_ = 0.0;
-    prev_dx_ = prev_dy_ = prev_yaw_ = 0.0;
-    first_update_ = true;
+    ros2_tools::msg::LidarPose lidar_pose;
+    lidar_pose.x = msg->pose.position.x;
+    lidar_pose.y = msg->pose.position.y;
+    lidar_pose.z = 0;
+    lidar_pose.roll = 0;
+    lidar_pose.pitch = 0;
+    lidar_pose.yaw = 0;
 
-    // 检查是否有目标朝向
-    auto &q = msg->pose.orientation;
-    if (fabs(q.x) > 0.001 || fabs(q.y) > 0.001 || fabs(q.z) > 0.001 ||
-        fabs(q.w - 1.0) > 0.001) {
-      // 有目标朝向
-      target_yaw_ = extractYawFromQuaternion(q);
-      has_target_yaw_ = true;
-      rotating_first_ = true;
-      // RCLCPP_INFO(this->get_logger(),
-      //             "Goal with orientation: pos(%.2f, %.2f), yaw=%.1f°",
-      //             msg->pose.position.x, msg->pose.position.y,
-      //             target_yaw_ * 180.0 / M_PI);
-    } else {
-      // 无目标朝向
-      has_target_yaw_ = false;
-      rotating_first_ = false;
-      // RCLCPP_INFO(this->get_logger(),
-      //             "Goal without orientation: pos(%.2f, %.2f)",
-      //             msg->pose.position.x, msg->pose.position.y);
-    }
-
-    computeAndPublish();
+    lidar_pub->publish(lidar_pose);
   }
 
   void lidarCallback(const ros2_tools::msg::LidarPose::SharedPtr msg) {
