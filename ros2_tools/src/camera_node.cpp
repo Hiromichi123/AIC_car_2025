@@ -63,7 +63,11 @@ private:
 
     this->cv_image.encoding = "bgr8";
     this->cv_image.image = this->flipped_frame;
-    camera_pub_->publish(*this->cv_image.toImageMsg());
+    //camera_pub_->publish(*this->cv_image.toImageMsg());
+
+    cv::Mat img = cv::imread("/home/jetson/ros2/AIC_car_2025/vision_node/yolo/1.jpg", cv::IMREAD_COLOR);
+    this->cv_image.image = img;
+    camera_pub_->publish(*cv_image.toImageMsg());
   }
 
   cv::VideoCapture camera;

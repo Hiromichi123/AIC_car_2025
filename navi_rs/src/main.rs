@@ -254,7 +254,7 @@ fn main() -> anyhow::Result<()> {
 
     let _ = navi_node.call_tts_blocking(
         &mut executor,
-        "前方是禁止通行指示牌",
+        "前方是禁止直行指示牌",
         Duration::from_secs(20),
     );
 
@@ -317,16 +317,6 @@ fn main() -> anyhow::Result<()> {
         vision_result_blocka.summary()
     );
 
-    let good_people = vision_result_blocka.good_people.unwrap_or_default();
-    let bad_people = vision_result_blocka.bad_people.unwrap_or_default();
-    let ebike = vision_result_blocka.automobile.unwrap_or_default();
-
-    let tts_text = format!(
-        "诶区域发现社区人员{}人,发现非社区人员{}人,违停车辆{}辆,已拍照",
-        good_people, bad_people, ebike
-    );
-    navi_node.call_tts_blocking(&mut executor, &tts_text, Duration::from_secs(10))?;
-
     let mut vision_result_blockb = VisionResult::new();
 
     if let Err(err) =
@@ -348,7 +338,7 @@ fn main() -> anyhow::Result<()> {
         &mut vision_result_blockb,
     );
 
-        vision::run_yolo_detection(
+    vision::run_yolo_detection(
         &navi_node,
         &mut executor,
         VisionRequest {
@@ -410,7 +400,7 @@ fn main() -> anyhow::Result<()> {
     fire_building = vision_result_blockb.fire.unwrap_or_default() - fire_building;
 
     // 使用 format! 重新赋值
-    let tts_text = format!("{}发现火灾{}处", tts_building, fire_building);
+    let tts_text = format!("{}发现火灾隐患{}个", tts_building, fire_building);
     navi_node.call_tts_blocking(&mut executor, &tts_text, Duration::from_secs(10))?;
 
     let waypoints = vec![
@@ -452,7 +442,7 @@ fn main() -> anyhow::Result<()> {
         &mut vision_result_blockb,
     );
 
-        vision::run_yolo_detection(
+    vision::run_yolo_detection(
         &navi_node,
         &mut executor,
         VisionRequest {
@@ -500,7 +490,7 @@ fn main() -> anyhow::Result<()> {
     fire_building = vision_result_blockb.fire.unwrap_or_default() - fire_building;
 
     // 使用 format! 重新赋值
-    let tts_text = format!("{}发现火灾{}处", tts_building, fire_building);
+    let tts_text = format!("{}发现火灾隐患{}个", tts_building, fire_building);
     navi_node.call_tts_blocking(&mut executor, &tts_text, Duration::from_secs(10))?;
 
     // Block B Summary
@@ -510,21 +500,20 @@ fn main() -> anyhow::Result<()> {
         vision_result_blockb.summary()
     );
 
-    let good_people = vision_result_blockb.good_people.unwrap_or_default();
-    let bad_people = vision_result_blockb.bad_people.unwrap_or_default();
-    let ebike = vision_result_blocka.automobile.unwrap_or_default();
+    let bad_people_b = vision_result_blockb.bad_people.unwrap_or_default();
+    let bad_people_a = vision_result_blocka.bad_people.unwrap_or_default();
+    let people_sum_a = vision_result_blocka.good_people.unwrap_or_default()
+        + vision_result_blocka.bad_people.unwrap_or_default();
+    let people_sum_b = vision_result_blockb.good_people.unwrap_or_default()
+        + vision_result_blockb.bad_people.unwrap_or_default();
 
-    let people_sum = vision_result_blocka.good_people.unwrap_or_default()
-        + vision_result_blockb.good_people.unwrap_or_default();
+    let people_sum = people_sum_a + people_sum_b;
 
     let tts_text = format!(
-        "比区域发现社区人员{}人,发现非社区人员{}人,违停车辆{}辆,已拍照",
-        good_people, bad_people, ebike
+        "社区内共有{}人，其中诶街人数{}人，比街人数{}人，发现{}名非社区人员在诶街，发现{}名非社区人员在比街，图片已保存。",
+        people_sum, people_sum_a, people_sum_b, bad_people_a, bad_people_b
     );
-    navi_node.call_tts_blocking(&mut executor, &tts_text, Duration::from_secs(10))?;
-
-    let tts_text2 = format!("共发现社区人员{}人", people_sum);
-    navi_node.call_tts_blocking(&mut executor, &tts_text2, Duration::from_secs(10))?;
+    navi_node.call_tts_blocking(&mut executor, &tts_text, Duration::from_secs(20))?;
 
     let mut vision_result_block_parking = VisionResult::new();
 
@@ -643,7 +632,7 @@ fn main() -> anyhow::Result<()> {
     );
 
     if let Some(rubbish_tts) = vision_result_block_parking.rubbish.as_deref() {
-        let _ = navi_node.call_tts_blocking(&mut executor, rubbish_tts, Duration::from_secs(10));
+        let _ = navi_node.call_tts_blocking(&mut executor, rubbish_tts, Duration::from_secs(40));
     } else {
         let _ =
             navi_node.call_tts_blocking(&mut executor, "垃圾分类识别失败", Duration::from_secs(10));
@@ -728,7 +717,7 @@ fn main() -> anyhow::Result<()> {
     let fire_building = vision_result_block_parking.fire.unwrap_or_default();
 
     // 使用 format! 重新赋值
-    let tts_text = format!("{}发现火灾{}处", tts_building, fire_building);
+    let tts_text = format!("{}发现火灾隐患{}个", tts_building, fire_building);
     navi_node.call_tts_blocking(&mut executor, &tts_text, Duration::from_secs(10))?;
 
     vision::run_yolo_detection(
@@ -771,15 +760,34 @@ fn main() -> anyhow::Result<()> {
         &mut vision_result_block_parking,
     );
 
+    let ebike_a = vision_result_blocka.automobile.unwrap_or_default();
+    let ebike_b = vision_result_blockb.automobile.unwrap_or_default();
+    let mut summary_ebike = String::new();
+
+    if ebike_a == 0 {
+        summary_ebike.push_str("诶街区无违停,");
+    } else {
+        summary_ebike.push_str(format!("诶街区有{}辆电动车违停,", ebike_a).as_str());
+    }
+
+    if ebike_b == 0 {
+        summary_ebike.push_str("比街区无违停,");
+    } else {
+        summary_ebike.push_str(format!("比街区有{}辆电动车违停,", ebike_a).as_str());
+    }
+
     let ebike_upright = vision_result_block_parking
         .ebike_upright
         .unwrap_or_default();
     let ebike_fallen = vision_result_block_parking.ebike_fallen.unwrap_or_default();
-    let tts_text = format!(
-        "停车区域电瓶车停放正确{}辆,倒伏{}辆",
-        ebike_upright, ebike_fallen
+    summary_ebike.push_str(
+        format!(
+            "停车区内电瓶车正常{}辆,倒伏{}辆",
+            ebike_upright, ebike_fallen
+        )
+        .as_str(),
     );
-    let _ = navi_node.call_tts_blocking(&mut executor, &tts_text, Duration::from_secs(10));
+    let _ = navi_node.call_tts_blocking(&mut executor, &summary_ebike, Duration::from_secs(10));
 
     let waypoints = vec![
         Pos {

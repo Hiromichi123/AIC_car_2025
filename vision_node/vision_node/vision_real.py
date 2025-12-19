@@ -333,6 +333,7 @@ class VisionNode(Node):
                             try:
                                 items_parts.append(f"{bin_map[all_results[i]]}，垃圾桶内垃圾为{item_names[i]}")
                                 if all_results[i] in rubbish_map[categories[i]]:
+                                    self.get_logger().info(f"{all_results[i]},{rubbish_map[categories[i]]}")
                                     items_parts.append(f"投放正确")
                                 else:
                                     items_parts.append(f"投放错误")
@@ -348,7 +349,7 @@ class VisionNode(Node):
                     self.get_logger().info(response.message)
                 else:
                     response.success = False
-                    response.message = f"垃圾分类失败:  {classify_response.message}.  垃圾桶检测:  {'; '.join(all_results)}"
+                    response.message = f"垃圾分类失败:{classify_response.message}垃圾桶检测:{', '.join(all_results)}"
                     self.get_logger().warn(f"yolip分类失败: {response.message}")
             except Exception as e:
                 response.success = False
@@ -488,7 +489,7 @@ class VisionNode(Node):
                 draw.text((x1, y1 - 30), text, font=font, fill=color)
 
                 # 记录结果（带位置信息）
-                result_str = f"[{camera_name}] {label} (置信度: {conf:.2f})"
+                result_str = f"{label}"
                 detections_with_position.append((center_x, result_str))
             
             # 按照x坐标从左到右排序
