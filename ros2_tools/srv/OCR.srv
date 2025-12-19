@@ -1,3 +1,4 @@
+string camera
 ---
 bool success
 string message

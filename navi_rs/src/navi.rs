@@ -14,6 +14,7 @@ use std::time::{Duration, Instant};
 macro_rules! spin_until_response {
     ($executor:expr, $promise:expr, $timeout:expr, $svc:literal) => {{
         let time_start = Instant::now();
+        let mut last_log = Instant::now();
         loop {
             if time_start.elapsed() > $timeout {
                 break Err(anyhow::anyhow!(
@@ -22,9 +23,20 @@ macro_rules! spin_until_response {
                 ));
             }
 
+            if last_log.elapsed() >= Duration::from_secs(1) {
+                log_info!(
+                    "navi",
+                    concat!("Waiting for ", $svc, " response... elapsed={:?}"),
+                    time_start.elapsed()
+                );
+                last_log = Instant::now();
+            }
+
             let mut spin_options = rclrs::SpinOptions::default();
-            spin_options.timeout = Some(Duration::from_millis(10));
-            spin_options.only_next_available_work = true;
+            // When other callbacks are constantly ready (e.g., high-rate subscriptions),
+            // spinning only one unit of work can starve the service response.
+            spin_options.timeout = Some(Duration::from_millis(50));
+            spin_options.only_next_available_work = false;
             $executor.spin(spin_options);
 
             match $promise.try_recv() {
@@ -290,11 +302,13 @@ impl NaviSubNode {
     pub fn call_ocr_blocking(
         &self,
         executor: &mut rclrs::Executor,
+        camera: Option<&str>,
         timeout: Duration,
     ) -> anyhow::Result<OCR_Response> {
         log_info!("navi", "Calling OCR service (blocking)...");
 
-        let request = OCR_Request::default();
+        let mut request = OCR_Request::default();
+        request.camera = camera.unwrap_or("both").to_string();
         sleep(std::time::Duration::from_secs_f32(0.5));
 
         // 使用阻塞调用：等待 Promise 完成并获取响应
@@ -420,8 +434,43 @@ impl NaviSubNode {
     ) -> anyhow::Result<TTS_Response> {
         log_info!("navi", "Calling TTS service (blocking)...");
 
+        // rclrs::Client::call() does not wait for a server to become available.
+        // If we send the request before discovery completes, we may never get a response.
+        if !self
+            .tts_client
+            .service_is_ready()
+            .map_err(|e| anyhow::anyhow!("TTS service_is_ready failed: {:?}", e))?
+        {
+            let service_name = self.tts_client.service_name();
+            log_info!(
+                "navi",
+                "Waiting for TTS service to become available: {}",
+                service_name
+            );
+
+            let ready_promise = self.tts_client.notify_on_service_ready();
+            let mut spin_options = rclrs::SpinOptions::default();
+            spin_options.only_next_available_work = false;
+            spin_options.until_promise_resolved = Some(ready_promise);
+            spin_options.timeout = Some(Duration::from_secs(3));
+            executor.spin(spin_options);
+
+            if !self
+                .tts_client
+                .service_is_ready()
+                .map_err(|e| anyhow::anyhow!("TTS service_is_ready failed: {:?}", e))?
+            {
+                return Err(anyhow::anyhow!(
+                    "TTS service not available after waiting (service: {})",
+                    self.tts_client.service_name()
+                ));
+            }
+        }
+
         let mut request = TTS_Request::default();
         request.text = text.to_string();
+
+        log_info!("navi", "calling tts service");
 
         let mut promise = self
             .tts_client

@@ -4,6 +4,12 @@ import cv2
 import yaml
 import logging
 import os
+import sys
+
+CN_CLIP_PATH = "/home/jetson/ros2/AIC_car_2025/yolip/yolip"
+if CN_CLIP_PATH not in sys.path:
+    sys.path.insert(0, CN_CLIP_PATH)
+
 import cn_clip.clip as clip
 from cn_clip.clip import load_from_name
 
@@ -11,8 +17,7 @@ logging.basicConfig(level=logging.INFO, format='[%(asctime)s] - %(levelname)s - 
 logger = logging.getLogger(__name__)
 
 # 获取文件的绝对路径
-current_dir = os.path.dirname(os.path.abspath(__file__))
-yaml_path = os.path.join(current_dir, "list_cn.yaml")
+yaml_path = os.path.join("/home/jetson/ros2/AIC_car_2025/yolip/yolip/scripts/list_cn.yaml")
 
 # 读取垃圾分类配置
 with open(yaml_path, 'r', encoding='utf-8') as f:
@@ -31,7 +36,7 @@ logger.info(f"加载垃圾分类标签: {len(prompt_words)} 个小类，{len(cat
 logger.info(f"大类: {list(category_dict.keys())}")
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-model, preprocess = load_from_name("ViT-L-14", device=device, download_root=current_dir)
+model, preprocess = load_from_name("ViT-H-14", device=device, download_root="/home/jetson/ros2/AIC_car_2025/yolip/yolip/")
 model.eval()
 logger.info("CLIP模型加载成功，使用: {}".format(device))
 
@@ -79,7 +84,7 @@ def infer(img) -> list[ClipResultObj]:
             conf = probs[i]
             
             if conf > 0.3:  # 只记录置信度较高的结果
-                logger.info(f"CLIP识别: [{category}] {item_name} - {conf:.3f}")
+                logger.info(f"CLIP识别:[{category}]{item_name}({conf:.3f})")
             
             results.append(
                 ClipResultObj(

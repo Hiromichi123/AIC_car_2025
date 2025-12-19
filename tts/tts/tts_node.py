@@ -4,6 +4,8 @@ os.environ["HF_HUB_OFFLINE"] = "1" # 强制禁止联网
 
 import rclpy
 from rclpy.node import Node
+from rclpy.executors import MultiThreadedExecutor
+from rclpy.callback_groups import ReentrantCallbackGroup
 
 from threading import Lock
 import sounddevice as sd
@@ -66,7 +68,8 @@ class IndexTTSNode(Node):
 
         # 3. 创建服务锁与服务端，确保同一时间只播放一个请求
         self._play_lock = Lock()
-        self.tts_service = self.create_service(TTS, 'tts_play', self.handle_tts_request)
+        self.cb_group = ReentrantCallbackGroup()
+        self.tts_service = self.create_service(TTS, 'tts_play', self.handle_tts_request, callback_group=self.cb_group)
         self.get_logger().info("TTS service 'tts_play' ready (blocking mode)")
     def synthesize_and_play(self, text: str):
         self.get_logger().info(f"Synthesizing: {text}")
@@ -117,15 +120,25 @@ def main(args=None):
     
     try:
         node = IndexTTSNode()
-        rclpy.spin(node)
+        executor = MultiThreadedExecutor()
+        executor.add_node(node)
+        executor.spin()
     except KeyboardInterrupt:
         pass
     except Exception as e:
         print(f"Runtime error: {e}")
     finally:
         if 'node' in locals():
-            node.destroy_node()
-        rclpy.shutdown()
+            try:
+                node.destroy_node()
+            except Exception:
+                pass
+        try:
+            if rclpy.ok():
+                rclpy.shutdown()
+        except Exception:
+            # Prevent crashing on shutdown when the context is already shut down.
+            pass
 
 if __name__ == '__main__':
     main()

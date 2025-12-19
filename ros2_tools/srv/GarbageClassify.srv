@@ -5,3 +5,8 @@ string message
 string category      # 大类（可回收垃圾、有害垃圾等）
 string item_name     # 小类（具体物品名称）
 float32 confidence   # 置信度
+
+# 多目标：按每个 YOLO 小框各自的 best CLIP 结果返回
+string[] categories
+string[] item_names
+float32[] confidences

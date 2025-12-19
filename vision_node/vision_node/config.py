@@ -38,6 +38,10 @@ def _build_ocr_model_config(base_dir: Path, variant: str) -> Dict[str, object]:
         "use_angle_cls": False,
         "lang": "ch",
         "use_gpu": False,
+        # 降低检测阈值以提高敏感度
+        "det_db_thresh": 0.3,  # 默认0.3，降低可检测更多文本区域
+        "det_db_box_thresh": 0.5,  # 默认0.6，降低可保留更多检测框
+        "det_db_unclip_ratio": 1.2,  # 默认1.5，增大可扩展文本区域
     }
 
 
@@ -62,13 +66,17 @@ def _apply_base_dir(base_dir: Path) -> None:
         "lang": "ch",
         "use_gpu": False,
         "show_log": False,
+        # 降低检测阈值以提高敏感度
+        "det_db_thresh": 0.3,
+        "det_db_box_thresh": 0.5,
+        "det_db_unclip_ratio": 1.6,
     }
 
     # 默认选用 BLUE 模型，可按需切换
-    CURRENT_MODEL = BLUE_MODEL
+    CURRENT_MODEL = DEFAULT_MODEL
 
     OCR_SAVE_DIR = str(base_dir / "ocr" / "inference_results")
-    YOLO_FONT_PATH = str(base_dir / "yolo" / "NotoSansSC-VariableFont_wght.ttf")
+    YOLO_FONT_PATH = str(base_dir / "ocr" / "NotoSansSC-VariableFont_wght.ttf")
     YOLO_SAVE_DIR = str(base_dir / "yolo" / "results")
 
     # 枚举 yolo 目录下的模型，键为不带扩展名的文件名，值为绝对路径
@@ -117,52 +125,6 @@ def configure_paths(src_dir: Optional[str]) -> str:
             raise ValueError(f"指定的 vision_node 源码目录不存在: {candidate}")
         _apply_base_dir(candidate)
     return VISION_NODE_SRC_DIR
-
-
-# 自定义YOLO标签 - 按模型分类
-# 每个模型有自己的标签映射和颜色配置
-YOLO_LABELS = {
-    "people_best": {
-        "labels": {
-            0: "社区内人员",
-            1: "非社区人员",
-        },
-        "colors": {
-            0: (0, 255, 0),  # 绿色 - 社区内人员
-            1: (255, 0, 0),  # 蓝色 - 非社区人员
-        },
-    },
-    "traffic_light": {
-        "labels": {
-            0: "红灯",
-            1: "黄灯",
-            2: "绿灯",
-        },
-        "colors": {
-            0: (0, 0, 255),  # 红色 - 红灯
-            1: (0, 255, 255),  # 黄色 - 黄灯
-            2: (0, 255, 0),  # 绿色 - 绿灯
-        },
-    },
-    "rubbish_bin_best": {
-        "labels": {
-            0: "垃圾桶",
-        },
-        "colors": {
-            0: (128, 128, 128),  # 灰色
-        },
-    },
-    "e_bike": {
-        "labels": {
-            0: "电动车",
-        },
-        "colors": {
-            0: (255, 165, 0),  # 橙色
-        },
-    },
-    # 默认标签配置（用于未知模型）
-    "default": {"labels": {}, "colors": {}},
-}
 
 # 初始化默认配置
 _apply_base_dir(_DEFAULT_SRC_DIR)
