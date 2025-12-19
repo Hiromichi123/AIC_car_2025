@@ -442,6 +442,9 @@ class VisionNode(Node):
             # 获取自定义映射
             custom_map = self.model_label_maps.get(model_name)
 
+            # 收集所有检测框信息，用于后续排序
+            detections_with_position = []
+
             # 处理每个检测框
             for box in boxes:
                 cls_id = int(box.cls)
@@ -456,6 +459,9 @@ class VisionNode(Node):
                     color = color_map.get(cls_id, (255, 255, 255))
 
                 x1, y1, x2, y2 = map(int, box.xyxy[0])
+                
+                # 计算检测框中心x坐标，用于排序
+                center_x = (x1 + x2) / 2
 
                 # 绘制矩形框
                 draw.rectangle([x1, y1, x2, y2], outline=color, width=3)
@@ -464,9 +470,15 @@ class VisionNode(Node):
                 text = f"{label} {conf:.2f}"
                 draw.text((x1, y1 - 30), text, font=font, fill=color)
 
-                # 记录结果
+                # 记录结果（带位置信息）
                 result_str = f"[{camera_name}] {label} (置信度: {conf:.2f})"
-                detection_results.append(result_str)
+                detections_with_position.append((center_x, result_str))
+            
+            # 按照x坐标从左到右排序
+            detections_with_position.sort(key=lambda item: item[0])
+            
+            # 提取排序后的结果字符串
+            detection_results.extend([item[1] for item in detections_with_position])
         
         # 2. 处理图像分类结果 (Probs) - 针对交通灯分类模型
         elif results and hasattr(results[0], 'probs') and results[0].probs is not None:
