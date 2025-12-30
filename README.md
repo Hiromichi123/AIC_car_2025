@@ -1,6 +1,5 @@
-# AIC Car 2025 ROS2 System
-
-This repository contains ROS2 packages for the AIC 2025 car robot platform, supporting both simulation (Gazebo) and real robot deployment.
+# AIC Car 2025 ROS2 System  
+# 第七届全球校园人工智能算法精英赛-应用赛道-智慧社区  国家级一等奖
 
 ## 结构总览
 
