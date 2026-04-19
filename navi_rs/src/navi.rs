@@ -24,6 +24,10 @@ pub struct Navi {
     pub is_arrived: bool,
     arrive_threshold: f64,
     current_waypoint_index: usize, // 当前目标点索引
+    jitter_enabled: bool,
+    jitter_translation_amp: f64,
+    jitter_yaw_amp: f64,
+    jitter_tick: u64,
 }
 
 pub struct NaviSubNode {
@@ -74,7 +78,41 @@ impl CoordUnit {
 
 impl Navi {
     fn new() -> Self {
-        Navi::default()
+        Navi {
+            jitter_enabled: true,
+            jitter_translation_amp: 0.03,
+            jitter_yaw_amp: 0.06,
+            ..Navi::default()
+        }
+    }
+
+    fn next_jitter(&mut self) -> (f64, f64, f64) {
+        if !self.jitter_enabled {
+            return (0.0, 0.0, 0.0);
+        }
+
+        self.jitter_tick = self.jitter_tick.wrapping_add(1);
+        let t = self.jitter_tick as f64;
+        let phase = self.current_waypoint_index as f64 * 1.37;
+
+        let dx = self.jitter_translation_amp * (t * 0.37 + phase).sin();
+        let dy = self.jitter_translation_amp * 0.7 * (t * 0.51 + phase * 0.6).cos();
+        let dyaw = self.jitter_yaw_amp * (t * 0.29 + phase * 0.9).sin();
+        (dx, dy, dyaw)
+    }
+
+    fn set_jitter_params(&mut self, enabled: bool, translation_amp: f64, yaw_amp: f64) {
+        self.jitter_enabled = enabled;
+        self.jitter_translation_amp = translation_amp.max(0.0);
+        self.jitter_yaw_amp = yaw_amp.max(0.0);
+        self.jitter_tick = 0;
+        log_info!(
+            "navi jitter",
+            "jitter enabled: {}, trans_amp: {:.3}m, yaw_amp: {:.3}rad",
+            self.jitter_enabled,
+            self.jitter_translation_amp,
+            self.jitter_yaw_amp
+        );
     }
 
     /// 设置一系列目标点
@@ -84,6 +122,7 @@ impl Navi {
             self.arrive_threshold = threshold;
             self.is_arrived = false;
             self.current_waypoint_index = 0;
+            self.jitter_tick = 0;
             log_info!(
                 "set destinations",
                 "set {} waypoints, threshold: {:.2}",
@@ -206,7 +245,7 @@ impl NaviSubNode {
                         }
                         Some(false) => {
                             // 继续导航，发布当前目标点
-                            let _ = NaviSubNode::publish_goal_with(&goal_pub_clone, &*navi);
+                            let _ = NaviSubNode::publish_goal_with(&goal_pub_clone, &mut *navi);
                         }
                         None => {
                             // 没有目标点
@@ -330,19 +369,24 @@ impl NaviSubNode {
         Ok(response)
     }
 
-    fn publish_goal_with(publisher: &Publisher<PoseStamped>, navi: &Navi) -> anyhow::Result<()> {
+    fn publish_goal_with(
+        publisher: &Publisher<PoseStamped>,
+        navi: &mut Navi,
+    ) -> anyhow::Result<()> {
         let dest = match navi.get_current_destination() {
-            Some(dest) => dest,
+            Some(dest) => *dest,
             None => {
                 log_info!("navi", "No destination set; skipping publish");
                 return Ok(());
             }
         };
 
-        let x = dest.translation.0;
-        let y = dest.translation.1;
+        let (jitter_x, jitter_y, jitter_yaw) = navi.next_jitter();
+
+        let x = dest.translation.0 + jitter_x;
+        let y = dest.translation.1 + jitter_y;
         let z = dest.translation.2;
-        let yaw = dest.rotation.2;
+        let yaw = dest.rotation.2 + jitter_yaw;
 
         let mut goal_msg = PoseStamped::default();
         goal_msg.header.frame_id = "odom".to_string();
@@ -359,20 +403,23 @@ impl NaviSubNode {
         publisher.publish(goal_msg)?;
         log_info!(
             "navi",
-            "Published goal {}/{}: ({:.2}, {:.2}, yaw: {:.2})",
+            "Published goal {}/{}: ({:.2}, {:.2}, yaw: {:.2}), jitter=({:+.3}, {:+.3}, {:+.3})",
             navi.current_waypoint_index + 1,
             navi.dest_pos.len(),
             x,
             y,
-            yaw
+            yaw,
+            jitter_x,
+            jitter_y,
+            jitter_yaw
         );
 
         Ok(())
     }
 
     pub fn publish_goal(&self) -> anyhow::Result<()> {
-        if let Ok(navi) = self.navi_instance.lock() {
-            Self::publish_goal_with(&self.goal_publisher, &*navi)
+        if let Ok(mut navi) = self.navi_instance.lock() {
+            Self::publish_goal_with(&self.goal_publisher, &mut *navi)
         } else {
             Err(anyhow::anyhow!("Failed to acquire navigation lock"))
         }
@@ -383,7 +430,21 @@ impl NaviSubNode {
         if let Ok(mut navi) = self.navi_instance.lock() {
             navi.set_destinations(destinations, threshold);
             // 立即发布第一个目标点
-            Self::publish_goal_with(&self.goal_publisher, &*navi)?;
+            Self::publish_goal_with(&self.goal_publisher, &mut *navi)?;
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("Failed to acquire navigation lock"))
+        }
+    }
+
+    pub fn configure_jitter(
+        &self,
+        enabled: bool,
+        translation_amp: f64,
+        yaw_amp: f64,
+    ) -> anyhow::Result<()> {
+        if let Ok(mut navi) = self.navi_instance.lock() {
+            navi.set_jitter_params(enabled, translation_amp, yaw_amp);
             Ok(())
         } else {
             Err(anyhow::anyhow!("Failed to acquire navigation lock"))

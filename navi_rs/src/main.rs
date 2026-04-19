@@ -11,6 +11,8 @@ fn main() -> anyhow::Result<()> {
 
     log_info!("navi_main", "starting navigator...");
     let navi_node = navi::NaviSubNode::new(&executor, "navigator", "lidar_data")?;
+    // Add a small deterministic jitter to mimic real controller/estimation oscillation.
+    navi_node.configure_jitter(true, 0.04, 0.12)?;
 
     let waypoints = vec![
         Pos {
@@ -18,12 +20,20 @@ fn main() -> anyhow::Result<()> {
             rotation: CoordUnit(0.0, 0.0, 0.0),
         },
         Pos {
+            translation: CoordUnit(3.3, 0.0, 0.0),
+            rotation: CoordUnit(0.0, 0.0, 1.6),
+        },
+        Pos {
             translation: CoordUnit(3.3, 1.3, 0.0),
-            rotation: CoordUnit(0.0, 0.0, 0.0),
+            rotation: CoordUnit(0.0, 0.0, 1.6),
+        },
+        Pos {
+            translation: CoordUnit(3.3, 1.3, 0.0),
+            rotation: CoordUnit(0.0, 0.0, 3.14),
         },
         Pos {
             translation: CoordUnit(2.4, 1.3, 0.0),
-            rotation: CoordUnit(0.0, 0.0, 0.0),
+            rotation: CoordUnit(0.0, 0.0, 3.14),
         },
     ];
 
@@ -47,18 +57,31 @@ fn main() -> anyhow::Result<()> {
     let yolo_response =
         navi_node.call_yolo_blocking(&mut executor, Duration::from_secs_f32(2.0))?;
     println!("yolo: {:?}", yolo_response.message);
+    std::thread::sleep(Duration::from_secs(2));
 
     let waypoints = vec![
         Pos {
             translation: CoordUnit(1.7, 1.3, 0.0),
-            rotation: CoordUnit(0.0, 0.0, 0.0),
+            rotation: CoordUnit(0.0, 0.0, 3.14),
+        },
+        Pos {
+            translation: CoordUnit(1.7, 1.3, 0.0),
+            rotation: CoordUnit(0.0, 0.0, 1.6),
         },
         Pos {
             translation: CoordUnit(1.7, 3.4, 0.0),
-            rotation: CoordUnit(0.0, 0.0, 0.0),
+            rotation: CoordUnit(0.0, 0.0, 1.6),
         },
         Pos {
-            translation: CoordUnit(0.6, 3.2, 0.0),
+            translation: CoordUnit(1.7, 3.4, 0.0),
+            rotation: CoordUnit(0.0, 0.0, 3.14),
+        },
+        Pos {
+            translation: CoordUnit(0.5, 3.3, 0.0),
+            rotation: CoordUnit(0.0, 0.0, 3.14),
+        },
+        Pos {
+            translation: CoordUnit(0.5, 3.3, 0.0),
             rotation: CoordUnit(0.0, 0.0, 1.6),
         },
     ];
@@ -80,9 +103,10 @@ fn main() -> anyhow::Result<()> {
     // OCR can take longer on CPU; allow a more generous timeout
     let ocr_response = navi_node.call_ocr_blocking(&mut executor, Duration::from_secs_f32(5.0))?;
     println!("ocr: {:?}", ocr_response.message);
+    std::thread::sleep(Duration::from_secs(2));
 
     let waypoints = vec![Pos {
-        translation: CoordUnit(0.6, 2.8, 0.0),
+        translation: CoordUnit(0.6, 2.5, 0.0),
         rotation: CoordUnit(0.0, 0.0, 1.6),
     }];
 
@@ -105,15 +129,16 @@ fn main() -> anyhow::Result<()> {
     // OCR can take longer on CPU; allow a more generous timeout
     let ocr_response = navi_node.call_ocr_blocking(&mut executor, Duration::from_secs_f32(5.0))?;
     println!("ocr: {:?}", ocr_response.message);
+    std::thread::sleep(Duration::from_secs(2));
 
     let waypoints = vec![
         Pos {
-            translation: CoordUnit(0.6, 2.8, 0.0),
-            rotation: CoordUnit(0.0, 0.0, 6.28),
+            translation: CoordUnit(0.6, 2.5, 0.0),
+            rotation: CoordUnit(0.0, 0.0, 1.6),
         },
         Pos {
             translation: CoordUnit(0.6, 0.0, 0.0),
-            rotation: CoordUnit(0.0, 0.0, 6.28),
+            rotation: CoordUnit(0.0, 0.0, 1.6),
         },
         Pos {
             translation: CoordUnit(0.0, 0.0, 0.0),
