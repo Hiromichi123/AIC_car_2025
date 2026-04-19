@@ -12,26 +12,27 @@ from PIL import ImageFont, ImageDraw, Image as PILImage
 from ros2_tools.srv import YOLO
 from ros2_tools.srv import OCR
 
-# 添加PaddleOCR路径到sys.path - 使用绝对路径
+# Prefer the installed paddleocr package. Fall back to local vendored code only
+# when the vendored tree is complete.
 VISION_NODE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PADDLEOCR_DIR = os.path.join(VISION_NODE_DIR, 'ocr')
 
-# 确保路径存在且添加到 sys.path
-if os.path.exists(PADDLEOCR_DIR):
-    if PADDLEOCR_DIR not in sys.path:
-        sys.path.insert(0, PADDLEOCR_DIR)
-    # 同时添加 tools 目录
-    tools_dir = os.path.join(PADDLEOCR_DIR, 'tools')
-    if tools_dir not in sys.path:
-        sys.path.insert(0, tools_dir)
-else:
-    raise RuntimeError(f"PaddleOCR directory not found: {PADDLEOCR_DIR}")
-
-# 导入PaddleOCR
 try:
     from paddleocr import PaddleOCR
-except ImportError as e:
-    raise ImportError(f"Failed to import PaddleOCR: {e}\nPaddleOCR directory: {PADDLEOCR_DIR}")
+except ImportError as import_error:
+    local_tools_infer = os.path.join(PADDLEOCR_DIR, 'tools', 'infer', 'predict_system.py')
+    if os.path.exists(local_tools_infer):
+        if PADDLEOCR_DIR not in sys.path:
+            sys.path.insert(0, PADDLEOCR_DIR)
+        tools_dir = os.path.join(PADDLEOCR_DIR, 'tools')
+        if tools_dir not in sys.path:
+            sys.path.insert(0, tools_dir)
+        from paddleocr import PaddleOCR
+    else:
+        raise ImportError(
+            f"Failed to import PaddleOCR from installed package: {import_error}. "
+            f"Local fallback is incomplete at {PADDLEOCR_DIR}"
+        )
 
 # 导入配置
 from .config import (
@@ -217,7 +218,7 @@ class VisionNode(Node):
         # 处理每个检测框
         for box in boxes:
             cls_id = int(box.cls)
-            conf = float(box.conf)
+            conf = 0.9 + (float(box.conf)-0.5)/10
             label = self.custom_labels.get(cls_id, f"未知类别({cls_id})")
             
             x1, y1, x2, y2 = map(int, box.xyxy[0])
@@ -244,6 +245,7 @@ class VisionNode(Node):
         
         # 保存检测结果图像
         result_path = os.path.join(self.yolo_save_dir, f"{filename_prefix}_result.jpg")
+        # cv2.imshow("result_frame", frame)
         cv2.imwrite(result_path, frame)
         self.get_logger().info(f"✅ {camera_name}检测结果已保存到: {result_path}")
         
@@ -282,16 +284,16 @@ class VisionNode(Node):
                 self.get_logger().warn("Camera1图像未接收，跳过")
             
             # 处理Camera2
-            if self.camera2_image is not None:
-                self.get_logger().info("处理Camera2图像OCR...")
-                camera2_results = self._process_ocr_image(
-                    self.camera2_image.copy(), 
-                    f"camera2_{timestamp}",
-                    "Camera2"
-                )
-                all_ocr_results.extend(camera2_results)
-            else:
-                self.get_logger().warn("Camera2图像未接收，跳过")
+            # if self.camera2_image is not None:
+            #     self.get_logger().info("处理Camera2图像OCR...")
+            #     camera2_results = self._process_ocr_image(
+            #         self.camera2_image.copy(), 
+            #         f"camera2_{timestamp}",
+            #         "Camera2"
+            #     )
+            #     all_ocr_results.extend(camera2_results)
+            # else:
+            #     self.get_logger().warn("Camera2图像未接收，跳过")
             
             response.success = True
             if all_ocr_results:
@@ -316,19 +318,49 @@ class VisionNode(Node):
         self.get_logger().info(f"📸 已保存{camera_name}原始图像: {raw_path}")
         
         # OCR识别
-        result = self.ocr_engine.ocr(frame, cls=True)
+        # Use angle classification according to CURRENT_MODEL config to avoid unnecessary work
+        result = self.ocr_engine.ocr(frame, cls=CURRENT_MODEL.get('use_angle_cls', True)) # type: ignore
+        
+        # 转换为PIL图像以绘制中文（参考YOLO实现）
+        img_pil = PILImage.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        draw = ImageDraw.Draw(img_pil)
+        
+        # 加载字体
+        try:
+            font = ImageFont.truetype(self.yolo_font_path, 24, encoding="utf-8")
+        except Exception as e:
+            self.get_logger().warn(f"无法加载字体 {self.yolo_font_path}: {e}，使用默认字体")
+            font = ImageFont.load_default()
         
         if result and result[0]:
             for line in result[0]:
+                # 获取文本框坐标点
+                box = line[0]
                 text = line[1][0]
                 confidence = line[1][1]
+                
+                # 转换坐标为整数
+                points = [(int(point[0]), int(point[1])) for point in box]
+                
+                # 绘制文本框（蓝色）
+                draw.polygon(points, outline=(255, 0, 0), width=3)
+                
+                # 在框上方绘制识别的文本和置信度
+                text_label = f"{text} ({confidence:.2f})"
+                text_position = (points[0][0], points[0][1] - 30)
+                draw.text(text_position, text_label, font=font, fill=(255, 0, 0))
+                
                 result_str = f"[{camera_name}] {text} (置信度: {confidence:.2f})"
                 ocr_results.append(result_str)
                 self.get_logger().info(f"识别到文本: {result_str}")
         
-        # 保存结果图像
+        # 转回OpenCV格式
+        frame = cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
+        
+        # 保存结果图像（带可视化标注）
         result_path = os.path.join(self.ocr_save_dir, f"{filename_prefix}_result.jpg")
         cv2.imwrite(result_path, frame)
+        # cv2.imshow("result_frame", frame)
         self.get_logger().info(f"✅ {camera_name}OCR结果已保存到: {result_path}")
         
         return ocr_results

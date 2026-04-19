@@ -78,7 +78,7 @@
     <!-- 雷达传感器仿真插件 -->
     <gazebo reference="laser">
         <sensor name="laser_sensor" type="ray">
-            <visualize>false</visualize>
+            <visualize>true</visualize>
             <update_rate>10</update_rate>
             <ray>
                 <scan>

@@ -1,6 +1,9 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.actions import ExecuteProcess, TimerAction
+from launch.actions import ExecuteProcess, TimerAction, Shutdown, DeclareLaunchArgument
+from launch.actions import SetEnvironmentVariable
+from launch.conditions import IfCondition
+from launch.substitutions import LaunchConfiguration
 from launch.substitutions import Command
 import os
 
@@ -10,6 +13,19 @@ def generate_launch_description():
     urdf_xacro = os.path.join(pkg_path, '..', 'urdf', 'robot.urdf.xacro')
     urdf_file = os.path.join(pkg_path, '..', 'urdf', 'robot.urdf')
     yaml_file = os.path.join(pkg_path, '..', 'urdf', 'mecanum_controllers.yaml')
+    gazebo_master_uri = os.environ.get('GAZEBO_MASTER_URI', 'http://127.0.0.1:11346')
+    gui = LaunchConfiguration('gui')
+
+    declare_gui = DeclareLaunchArgument(
+        'gui',
+        default_value='true',
+        description='Whether to start Gazebo client GUI (gzclient).'
+    )
+
+    set_gazebo_master_uri = SetEnvironmentVariable(
+        name='GAZEBO_MASTER_URI',
+        value=gazebo_master_uri,
+    )
 
     # xacro 生成 urdf
     xacro_urdf_process = ExecuteProcess(
@@ -28,13 +44,21 @@ def generate_launch_description():
 
     # 启动 Gazebo
     gazebo_process = ExecuteProcess(
-        cmd=['gazebo', 
+        cmd=['gzserver',
             '-s', 'libgazebo_ros_factory.so',
             '-s', 'libgazebo_ros_init.so',
             world_file,
         ],
-        output='screen'
+        output='screen',
+        on_exit=Shutdown(reason='Gazebo server exited')
     )
+
+    gazebo_client_process = ExecuteProcess(
+        cmd=['gzclient'],
+        output='screen',
+        condition=IfCondition(gui)
+    )
+    gazebo_client_process = TimerAction(period=2.0, actions=[gazebo_client_process])
 
     # 使用参数服务器加载URDF
     spawn_entity_node = Node(
@@ -62,7 +86,10 @@ def generate_launch_description():
     mecanum_controller_spawner = TimerAction(period=10.0, actions=[mecanum_controller_spawner]) # 延迟10秒启动
 
     return LaunchDescription([
+        declare_gui,
+        set_gazebo_master_uri,
         robot_description,
         gazebo_process,
+        gazebo_client_process,
         spawn_entity_node,
     ])

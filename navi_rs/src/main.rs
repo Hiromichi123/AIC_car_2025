@@ -1,5 +1,5 @@
 use rclrs::{log_info, CreateBasicExecutor, SpinOptions};
-use std::{thread::sleep, time::Duration};
+use std::time::Duration;
 
 use crate::navi::{CoordUnit, Pos};
 
@@ -54,11 +54,11 @@ fn main() -> anyhow::Result<()> {
             rotation: CoordUnit(0.0, 0.0, 0.0),
         },
         Pos {
-            translation: CoordUnit(1.7, 3.3, 0.0),
+            translation: CoordUnit(1.7, 3.4, 0.0),
             rotation: CoordUnit(0.0, 0.0, 0.0),
         },
         Pos {
-            translation: CoordUnit(0.6, 3.1, 0.0),
+            translation: CoordUnit(0.6, 3.2, 0.0),
             rotation: CoordUnit(0.0, 0.0, 1.6),
         },
     ];
@@ -77,7 +77,8 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
-    let ocr_response = navi_node.call_ocr_blocking(&mut executor, Duration::from_secs_f32(2.0))?;
+    // OCR can take longer on CPU; allow a more generous timeout
+    let ocr_response = navi_node.call_ocr_blocking(&mut executor, Duration::from_secs_f32(5.0))?;
     println!("ocr: {:?}", ocr_response.message);
 
     let waypoints = vec![Pos {
@@ -99,8 +100,11 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
-    log_info!("navi_main", "Sleeping for 4 secs.");
-    sleep(std::time::Duration::from_secs_f32(4.0));
+    // log_info!("navi_main", "Sleeping for 4 secs.");
+    // sleep(std::time::Duration::from_secs_f32(4.0));
+    // OCR can take longer on CPU; allow a more generous timeout
+    let ocr_response = navi_node.call_ocr_blocking(&mut executor, Duration::from_secs_f32(5.0))?;
+    println!("ocr: {:?}", ocr_response.message);
 
     let waypoints = vec![
         Pos {
